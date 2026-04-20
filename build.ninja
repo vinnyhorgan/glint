@@ -1,5 +1,4 @@
 ninja_required_version = 1.7
-builddir = build
 cc = cc
 ar = ar
 common_cppflags = -Ivendor/glfw/include -Ivendor/glfw/src -Ivendor/glad/include -D_GLFW_X11 -D_DEFAULT_SOURCE
@@ -34,7 +33,7 @@ rule link
 
 rule clean
   command = rm -rf build
-  description = CLEAN build
+  description = CLEAN build outputs
 
 # release
 build build/release/obj/src/main.o: cc_app src/main.c

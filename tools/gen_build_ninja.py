@@ -83,7 +83,6 @@ def build_ninja_text() -> str:
 
     lines = [
         "ninja_required_version = 1.7",
-        f"builddir = {BUILD_DIR}",
         "cc = cc",
         "ar = ar",
         f"common_cppflags = {common_cppflags}",
@@ -118,7 +117,7 @@ def build_ninja_text() -> str:
         "",
         "rule clean",
         "  command = rm -rf build",
-        "  description = CLEAN build",
+        "  description = CLEAN build outputs",
         "",
     ]
 
