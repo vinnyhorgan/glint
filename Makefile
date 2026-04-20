@@ -2,7 +2,7 @@ CC ?= cc
 
 BUILD_DIR := build
 TARGET := $(BUILD_DIR)/gles2_test
-LOCAL_SRCS := src/gles2_test.c
+LOCAL_SRCS := src/main.c
 
 GLFW_DIR := vendor/glfw
 GLAD_DIR := vendor/glad
