@@ -46,7 +46,7 @@ APP_CFLAGS := -Wall -Wextra -Wpedantic -Werror
 VENDOR_CFLAGS := -w
 
 LDFLAGS += -Wl,--gc-sections -Wl,-s
-LDLIBS := -lX11 -lm
+LDLIBS := -lm
 
 Q := @
 ifneq ($(V),)
