@@ -1,13 +1,15 @@
 CC ?= cc
+AR ?= ar
 
+PROJECT := glint
 BUILD_DIR := build
-TARGET := $(BUILD_DIR)/gles2_test
-LOCAL_SRCS := src/main.c
+TARGET := $(BUILD_DIR)/$(PROJECT)
+GLFW_LIB := $(BUILD_DIR)/libglfw_x11.a
 
 GLFW_DIR := vendor/glfw
 GLAD_DIR := vendor/glad
-GLFW_INC := -I$(GLFW_DIR)/include -I$(GLFW_DIR)/src -I$(GLAD_DIR)/include
-GLFW_DEFS := -D_GLFW_X11 -D_DEFAULT_SOURCE
+
+APP_SRCS := src/main.c
 GLFW_SRCS := \
 	$(GLFW_DIR)/src/context.c \
 	$(GLFW_DIR)/src/init.c \
@@ -33,25 +35,41 @@ GLFW_SRCS := \
 	$(GLFW_DIR)/src/x11_window.c \
 	$(GLFW_DIR)/src/xkb_unicode.c
 
-PKG_CONFIG ?= pkg-config
-X11_PACKAGES := x11 xrandr xi xinerama xcursor xext
+APP_OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(APP_SRCS))
+GLFW_OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(GLFW_SRCS))
 
-X11_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(X11_PACKAGES))
-X11_LIBS := $(shell $(PKG_CONFIG) --libs $(X11_PACKAGES))
+CPPFLAGS += -I$(GLFW_DIR)/include -I$(GLFW_DIR)/src -I$(GLAD_DIR)/include
+CPPFLAGS += -D_GLFW_X11 -D_DEFAULT_SOURCE -DNDEBUG
 
-CFLAGS ?= -O2
-CFLAGS += -std=c99 -Wall -Wextra -pedantic $(GLFW_INC) $(GLFW_DEFS) $(X11_CFLAGS)
-LDLIBS += $(X11_LIBS) -ldl -lpthread -lm
+COMMON_CFLAGS := -std=c11 -Os -ffunction-sections -fdata-sections
+APP_CFLAGS := -Wall -Wextra -Wpedantic -Werror
+VENDOR_CFLAGS := -w
+
+LDFLAGS += -Wl,--gc-sections -Wl,-s
+LDLIBS := -lX11 -lm
+
+Q := @
+ifneq ($(V),)
+Q :=
+endif
 
 .PHONY: all clean
 
 all: $(TARGET)
 
-$(TARGET): $(LOCAL_SRCS) $(GLFW_SRCS) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(GLFW_SRCS) $(LOCAL_SRCS) -o $@ $(LDLIBS)
+$(TARGET): $(APP_OBJS) $(GLFW_LIB)
+	$(Q)$(CC) $(LDFLAGS) $(APP_OBJS) $(GLFW_LIB) -o $@ $(LDLIBS)
 
-$(BUILD_DIR):
-	mkdir -p $@
+$(GLFW_LIB): $(GLFW_OBJS)
+	$(Q)$(AR) rcs $@ $(GLFW_OBJS)
+
+$(BUILD_DIR)/src/%.o: src/%.c
+	$(Q)mkdir -p $(dir $@)
+	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(COMMON_CFLAGS) $(APP_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/vendor/glfw/src/%.o: vendor/glfw/src/%.c
+	$(Q)mkdir -p $(dir $@)
+	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(COMMON_CFLAGS) $(VENDOR_CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(BUILD_DIR)
+	$(Q)rm -rf $(BUILD_DIR)
