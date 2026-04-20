@@ -5,7 +5,8 @@ TARGET := $(BUILD_DIR)/gles2_test
 LOCAL_SRCS := src/gles2_test.c
 
 GLFW_DIR := vendor/glfw
-GLFW_INC := -I$(GLFW_DIR)/include -I$(GLFW_DIR)/src
+GLAD_DIR := vendor/glad
+GLFW_INC := -I$(GLFW_DIR)/include -I$(GLFW_DIR)/src -I$(GLAD_DIR)/include
 GLFW_DEFS := -D_GLFW_X11 -D_DEFAULT_SOURCE
 GLFW_SRCS := \
 	$(GLFW_DIR)/src/context.c \
@@ -34,16 +35,13 @@ GLFW_SRCS := \
 
 PKG_CONFIG ?= pkg-config
 X11_PACKAGES := x11 xrandr xi xinerama xcursor xext
-GLES_PACKAGES := egl glesv2
 
 X11_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(X11_PACKAGES))
 X11_LIBS := $(shell $(PKG_CONFIG) --libs $(X11_PACKAGES))
-GLES_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(GLES_PACKAGES))
-GLES_LIBS := $(shell $(PKG_CONFIG) --libs $(GLES_PACKAGES))
 
 CFLAGS ?= -O2
-CFLAGS += -std=c99 -Wall -Wextra -pedantic $(GLFW_INC) $(GLFW_DEFS) $(X11_CFLAGS) $(GLES_CFLAGS)
-LDLIBS += $(X11_LIBS) $(GLES_LIBS) -ldl -lpthread -lm
+CFLAGS += -std=c99 -Wall -Wextra -pedantic $(GLFW_INC) $(GLFW_DEFS) $(X11_CFLAGS)
+LDLIBS += $(X11_LIBS) -ldl -lpthread -lm
 
 .PHONY: all clean
 

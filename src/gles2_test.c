@@ -1,4 +1,7 @@
-#define GLFW_INCLUDE_ES2
+#define GLAD_GLES2_IMPLEMENTATION
+#include <glad/gles2.h>
+
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
 #include <stdio.h>
@@ -6,6 +9,11 @@
 static void error_callback(int code, const char* description)
 {
     fprintf(stderr, "GLFW error %d: %s\n", code, description);
+}
+
+static GLADapiproc glfw_glad_loader(const char* name)
+{
+    return glfwGetProcAddress(name);
 }
 
 int main(void)
@@ -30,6 +38,15 @@ int main(void)
     }
 
     glfwMakeContextCurrent(window);
+
+    if (!gladLoadGLES2(glfw_glad_loader))
+    {
+        fprintf(stderr, "Failed to load OpenGL ES 2.0 entry points via glad\n");
+        glfwDestroyWindow(window);
+        glfwTerminate();
+        return 1;
+    }
+
     glfwSwapInterval(1);
 
     while (!glfwWindowShouldClose(window))
