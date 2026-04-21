@@ -7,7 +7,7 @@ ninja_required_version = 1.7
 cc = cc
 ar = ar
 
-cppflags = -Ivendor/glad/include -Ivendor/glfw/include -Ivendor/glfw/src -Ivendor/pocketpy -Ivendor/miniaudio -D_GLFW_X11 -D_DEFAULT_SOURCE
+cppflags = -Isrc -Ivendor/glad/include -Ivendor/glfw/include -Ivendor/glfw/src -Ivendor/pocketpy -Ivendor/miniaudio -D_GLFW_X11 -D_DEFAULT_SOURCE
 common_cflags = -std=c11 -ffunction-sections -fdata-sections
 app_warnings = -Wall -Wextra -Wpedantic -Werror
 vendor_warnings = -w
@@ -42,6 +42,16 @@ build build/release/obj/src/main.o: cc src/main.c
   mode_cflags = $release_cflags
   warnings = $app_warnings
 build build/release/obj/src/gl.o: cc src/gl.c
+  cppflags = $cppflags
+  cflags = $common_cflags
+  mode_cflags = $release_cflags
+  warnings = $app_warnings
+build build/release/obj/src/gl_core.o: cc src/gl_core.c
+  cppflags = $cppflags
+  cflags = $common_cflags
+  mode_cflags = $release_cflags
+  warnings = $app_warnings
+build build/release/obj/src/gl_bindings.o: cc src/gl_bindings.c
   cppflags = $cppflags
   cflags = $common_cflags
   mode_cflags = $release_cflags
@@ -174,7 +184,29 @@ build build/release/obj/vendor/miniaudio/miniaudio.o: cc vendor/miniaudio/miniau
   mode_cflags = $release_cflags
   warnings = $vendor_warnings
 build build/release/libminiaudio.a: ar build/release/obj/vendor/miniaudio/miniaudio.o
-build build/glint: link build/release/obj/src/main.o build/release/obj/src/gl.o build/release/libglfw.a build/release/libpocketpy.a build/release/libminiaudio.a
+build build/glint: link build/release/obj/src/main.o build/release/obj/src/gl.o build/release/obj/src/gl_core.o build/release/obj/src/gl_bindings.o build/release/libglfw.a build/release/libpocketpy.a build/release/libminiaudio.a
+  ldflags = $release_ldflags
+build build/release/obj/tests/tests/test_gl_core.o: cc tests/test_gl_core.c
+  cppflags = $cppflags
+  cflags = $common_cflags
+  mode_cflags = $release_cflags
+  warnings = $app_warnings
+build build/release/obj/tests/tests/test_gl_bindings.o: cc tests/test_gl_bindings.c
+  cppflags = $cppflags
+  cflags = $common_cflags
+  mode_cflags = $release_cflags
+  warnings = $app_warnings
+build build/release/obj/tests/src/gl_core.o: cc src/gl_core.c
+  cppflags = $cppflags
+  cflags = $common_cflags
+  mode_cflags = $release_cflags
+  warnings = $app_warnings
+build build/release/obj/tests/src/gl_bindings.o: cc src/gl_bindings.c
+  cppflags = $cppflags
+  cflags = $common_cflags
+  mode_cflags = $release_cflags
+  warnings = $app_warnings
+build build/glint-tests: link build/release/obj/tests/tests/test_gl_core.o build/release/obj/tests/tests/test_gl_bindings.o build/release/obj/tests/src/gl_core.o build/release/obj/tests/src/gl_bindings.o build/release/libpocketpy.a
   ldflags = $release_ldflags
 
 # --- debug ---
@@ -184,6 +216,16 @@ build build/debug/obj/src/main.o: cc src/main.c
   mode_cflags = $debug_cflags
   warnings = $app_warnings
 build build/debug/obj/src/gl.o: cc src/gl.c
+  cppflags = $cppflags
+  cflags = $common_cflags
+  mode_cflags = $debug_cflags
+  warnings = $app_warnings
+build build/debug/obj/src/gl_core.o: cc src/gl_core.c
+  cppflags = $cppflags
+  cflags = $common_cflags
+  mode_cflags = $debug_cflags
+  warnings = $app_warnings
+build build/debug/obj/src/gl_bindings.o: cc src/gl_bindings.c
   cppflags = $cppflags
   cflags = $common_cflags
   mode_cflags = $debug_cflags
@@ -316,14 +358,38 @@ build build/debug/obj/vendor/miniaudio/miniaudio.o: cc vendor/miniaudio/miniaudi
   mode_cflags = $debug_cflags
   warnings = $vendor_warnings
 build build/debug/libminiaudio.a: ar build/debug/obj/vendor/miniaudio/miniaudio.o
-build build/glint-debug: link build/debug/obj/src/main.o build/debug/obj/src/gl.o build/debug/libglfw.a build/debug/libpocketpy.a build/debug/libminiaudio.a
+build build/glint-debug: link build/debug/obj/src/main.o build/debug/obj/src/gl.o build/debug/obj/src/gl_core.o build/debug/obj/src/gl_bindings.o build/debug/libglfw.a build/debug/libpocketpy.a build/debug/libminiaudio.a
+  ldflags = $debug_ldflags
+build build/debug/obj/tests/tests/test_gl_core.o: cc tests/test_gl_core.c
+  cppflags = $cppflags
+  cflags = $common_cflags
+  mode_cflags = $debug_cflags
+  warnings = $app_warnings
+build build/debug/obj/tests/tests/test_gl_bindings.o: cc tests/test_gl_bindings.c
+  cppflags = $cppflags
+  cflags = $common_cflags
+  mode_cflags = $debug_cflags
+  warnings = $app_warnings
+build build/debug/obj/tests/src/gl_core.o: cc src/gl_core.c
+  cppflags = $cppflags
+  cflags = $common_cflags
+  mode_cflags = $debug_cflags
+  warnings = $app_warnings
+build build/debug/obj/tests/src/gl_bindings.o: cc src/gl_bindings.c
+  cppflags = $cppflags
+  cflags = $common_cflags
+  mode_cflags = $debug_cflags
+  warnings = $app_warnings
+build build/glint-tests-debug: link build/debug/obj/tests/tests/test_gl_core.o build/debug/obj/tests/tests/test_gl_bindings.o build/debug/obj/tests/src/gl_core.o build/debug/obj/tests/src/gl_bindings.o build/debug/libpocketpy.a
   ldflags = $debug_ldflags
 
 build build/release: phony build/glint
 build build/debug: phony build/glint-debug
 build release: phony build/glint
 build debug: phony build/glint-debug
-build all: phony build/glint build/glint-debug
+build tests: phony build/glint-tests
+build tests-debug: phony build/glint-tests-debug
+build all: phony build/glint build/glint-debug build/glint-tests build/glint-tests-debug
 build clean: clean
 default build/glint
 

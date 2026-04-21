@@ -16,6 +16,19 @@ BUILD_DIR = "build"
 APP_SRCS = [
     "src/main.c",
     "src/gl.c",
+    "src/gl_core.c",
+    "src/gl_bindings.c",
+]
+
+TEST_SRCS = [
+    "tests/test_gl_core.c",
+    "tests/test_gl_bindings.c",
+    "src/gl_core.c",
+    "src/gl_bindings.c",
+]
+
+TEST_LIBS = [
+    "pocketpy",
 ]
 
 VENDOR_LIBS = [
@@ -79,6 +92,7 @@ VENDOR_LIBS = [
 ]
 
 EXTRA_INCS = [
+    "src",
     "vendor/glad/include",
 ]
 
@@ -99,6 +113,10 @@ def obj_path(config: str, src: str) -> str:
     return f"{BUILD_DIR}/{config}/obj/{src[:-2]}.o"
 
 
+def named_obj_path(config: str, group: str, src: str) -> str:
+    return f"{BUILD_DIR}/{config}/obj/{group}/{src[:-2]}.o"
+
+
 def archive_path(config: str, name: str) -> str:
     return f"{BUILD_DIR}/{config}/lib{name}.a"
 
@@ -106,6 +124,11 @@ def archive_path(config: str, name: str) -> str:
 def target_path(config: str) -> str:
     suffix = "" if config == "release" else "-debug"
     return f"{BUILD_DIR}/{PROJECT}{suffix}"
+
+
+def test_target_path(config: str) -> str:
+    suffix = "" if config == "release" else "-debug"
+    return f"{BUILD_DIR}/{PROJECT}-tests{suffix}"
 
 
 # =============================================================================
@@ -224,17 +247,31 @@ def build_ninja_text() -> str:
         all_inputs = app_objs + archives
         lines.append(f"build {escape(target)}: link {join(all_inputs)}")
         lines.append(f"  ldflags = {ldflags}")
+        test_objs = [named_obj_path(config, "tests", src) for src in TEST_SRCS]
+        test_archives = [archive_path(config, name) for name in TEST_LIBS]
+        for src, obj in zip(TEST_SRCS, test_objs):
+            lines.append(f"build {escape(obj)}: cc {escape(src)}")
+            lines.append(f"  cppflags = $cppflags")
+            lines.append(f"  cflags = $common_cflags")
+            lines.append(f"  mode_cflags = {mode_cflags}")
+            lines.append(f"  warnings = $app_warnings")
+        lines.append(f"build {escape(test_target_path(config))}: link {join(test_objs + test_archives)}")
+        lines.append(f"  ldflags = {ldflags}")
         lines.append("")
 
     # Phony targets
     release_target = escape(target_path("release"))
     debug_target = escape(target_path("debug"))
+    release_tests = escape(test_target_path("release"))
+    debug_tests = escape(test_target_path("debug"))
     lines.extend([
         f"build {BUILD_DIR}/release: phony {release_target}",
         f"build {BUILD_DIR}/debug: phony {debug_target}",
         f"build release: phony {release_target}",
         f"build debug: phony {debug_target}",
-        f"build all: phony {release_target} {debug_target}",
+        f"build tests: phony {release_tests}",
+        f"build tests-debug: phony {debug_tests}",
+        f"build all: phony {release_target} {debug_target} {release_tests} {debug_tests}",
         "build clean: clean",
         f"default {release_target}",
         "",
