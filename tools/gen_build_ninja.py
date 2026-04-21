@@ -1,52 +1,105 @@
 #!/usr/bin/env python3
+"""Generate build.ninja for the glint project."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 
+# =============================================================================
+# Configuration
+# =============================================================================
+
 PROJECT = "glint"
 BUILD_DIR = "build"
-GLFW_DIR = "vendor/glfw"
-GLAD_DIR = "vendor/glad"
 
 APP_SRCS = [
     "src/main.c",
 ]
 
-GLFW_SRCS = [
-    f"{GLFW_DIR}/src/context.c",
-    f"{GLFW_DIR}/src/init.c",
-    f"{GLFW_DIR}/src/input.c",
-    f"{GLFW_DIR}/src/monitor.c",
-    f"{GLFW_DIR}/src/platform.c",
-    f"{GLFW_DIR}/src/vulkan.c",
-    f"{GLFW_DIR}/src/window.c",
-    f"{GLFW_DIR}/src/egl_context.c",
-    f"{GLFW_DIR}/src/glx_context.c",
-    f"{GLFW_DIR}/src/osmesa_context.c",
-    f"{GLFW_DIR}/src/null_init.c",
-    f"{GLFW_DIR}/src/null_joystick.c",
-    f"{GLFW_DIR}/src/null_monitor.c",
-    f"{GLFW_DIR}/src/null_window.c",
-    f"{GLFW_DIR}/src/linux_joystick.c",
-    f"{GLFW_DIR}/src/posix_module.c",
-    f"{GLFW_DIR}/src/posix_poll.c",
-    f"{GLFW_DIR}/src/posix_thread.c",
-    f"{GLFW_DIR}/src/posix_time.c",
-    f"{GLFW_DIR}/src/x11_init.c",
-    f"{GLFW_DIR}/src/x11_monitor.c",
-    f"{GLFW_DIR}/src/x11_window.c",
-    f"{GLFW_DIR}/src/xkb_unicode.c",
+VENDOR_LIBS = [
+    {
+        "name": "glfw",
+        "srcs": [
+            "vendor/glfw/src/context.c",
+            "vendor/glfw/src/init.c",
+            "vendor/glfw/src/input.c",
+            "vendor/glfw/src/monitor.c",
+            "vendor/glfw/src/platform.c",
+            "vendor/glfw/src/vulkan.c",
+            "vendor/glfw/src/window.c",
+            "vendor/glfw/src/egl_context.c",
+            "vendor/glfw/src/glx_context.c",
+            "vendor/glfw/src/osmesa_context.c",
+            "vendor/glfw/src/null_init.c",
+            "vendor/glfw/src/null_joystick.c",
+            "vendor/glfw/src/null_monitor.c",
+            "vendor/glfw/src/null_window.c",
+            "vendor/glfw/src/linux_joystick.c",
+            "vendor/glfw/src/posix_module.c",
+            "vendor/glfw/src/posix_poll.c",
+            "vendor/glfw/src/posix_thread.c",
+            "vendor/glfw/src/posix_time.c",
+            "vendor/glfw/src/x11_init.c",
+            "vendor/glfw/src/x11_monitor.c",
+            "vendor/glfw/src/x11_window.c",
+            "vendor/glfw/src/xkb_unicode.c",
+        ],
+        "incs": [
+            "vendor/glfw/include",
+            "vendor/glfw/src",
+        ],
+        "defs": [
+            "_GLFW_X11",
+            "_DEFAULT_SOURCE",
+        ],
+    },
+    {
+        "name": "pocketpy",
+        "srcs": [
+            "vendor/pocketpy/pocketpy.c",
+        ],
+        "incs": [
+            "vendor/pocketpy",
+        ],
+        "defs": [],
+        "cflags": "--std=c11 -ffunction-sections -fdata-sections",
+    },
+    {
+        "name": "miniaudio",
+        "srcs": [
+            "vendor/miniaudio/miniaudio.c",
+        ],
+        "incs": [
+            "vendor/miniaudio",
+        ],
+        "defs": [],
+    },
 ]
+
+EXTRA_INCS = [
+    "vendor/glad/include",
+]
+
+
+# =============================================================================
+# Helpers
+# =============================================================================
+
+def escape(value: str) -> str:
+    return value.replace("$", "$$").replace(" ", "$")
+
+
+def join(values: list[str]) -> str:
+    return " ".join(escape(v) for v in values)
 
 
 def obj_path(config: str, src: str) -> str:
     return f"{BUILD_DIR}/{config}/obj/{src[:-2]}.o"
 
 
-def archive_path(config: str) -> str:
-    return f"{BUILD_DIR}/{config}/libglfw_x11.a"
+def archive_path(config: str, name: str) -> str:
+    return f"{BUILD_DIR}/{config}/lib{name}.a"
 
 
 def target_path(config: str) -> str:
@@ -54,24 +107,36 @@ def target_path(config: str) -> str:
     return f"{BUILD_DIR}/{PROJECT}{suffix}"
 
 
-def escape(value: str) -> str:
-    return value.replace("$", "$$").replace(" ", "$ ")
-
-
-def join_paths(paths: list[str]) -> str:
-    return " ".join(escape(path) for path in paths)
-
+# =============================================================================
+# Generator
+# =============================================================================
 
 def build_ninja_text() -> str:
-    common_cppflags = " ".join(
-        [
-            f"-I{GLFW_DIR}/include",
-            f"-I{GLFW_DIR}/src",
-            f"-I{GLAD_DIR}/include",
-            "-D_GLFW_X11",
-            "-D_DEFAULT_SOURCE",
-        ]
-    )
+    # Collect all includes and defines
+    all_incs = EXTRA_INCS[:]
+    all_defs = []
+    for lib in VENDOR_LIBS:
+        all_incs.extend(lib.get("incs", []))
+        all_defs.extend(lib.get("defs", []))
+
+    # Unique-ify while preserving order
+    seen = set()
+    unique_incs = []
+    for inc in all_incs:
+        if inc not in seen:
+            seen.add(inc)
+            unique_incs.append(inc)
+
+    seen = set()
+    unique_defs = []
+    for def_ in all_defs:
+        if def_ not in seen:
+            seen.add(def_)
+            unique_defs.append(def_)
+
+    cppflags = " ".join(f"-I{inc}" for inc in unique_incs)
+    cppflags += " " + " ".join(f"-D{def_}" for def_ in unique_defs)
+
     common_cflags = "-std=c11 -ffunction-sections -fdata-sections"
     app_warnings = "-Wall -Wextra -Wpedantic -Werror"
     vendor_warnings = "-w"
@@ -79,13 +144,19 @@ def build_ninja_text() -> str:
     debug_cflags = "-O0 -g3"
     release_ldflags = "-Wl,--gc-sections -Wl,-s"
     debug_ldflags = ""
-    ldlibs = "-lm"
+    ldlibs = "-lm -ldl -lpthread"
 
     lines = [
+        "# ============================================================================",
+        "# Auto-generated by tools/gen_build_ninja.py",
+        "# Do not edit manually -- run `python3 tools/gen_build_ninja.py` instead",
+        "# ============================================================================",
+        "",
         "ninja_required_version = 1.7",
         "cc = cc",
         "ar = ar",
-        f"common_cppflags = {common_cppflags}",
+        "",
+        f"cppflags = {cppflags}",
         f"common_cflags = {common_cflags}",
         f"app_warnings = {app_warnings}",
         f"vendor_warnings = {vendor_warnings}",
@@ -95,24 +166,18 @@ def build_ninja_text() -> str:
         f"debug_ldflags = {debug_ldflags}",
         f"ldlibs = {ldlibs}",
         "",
-        "rule cc_app",
-        "  command = mkdir -p $$(dirname \"$out\") && $cc $common_cppflags $common_cflags $mode_cflags $app_warnings -MMD -MF $out.d -c $in -o $out",
-        "  depfile = $out.d",
-        "  deps = gcc",
-        "  description = CC $out",
-        "",
-        "rule cc_vendor",
-        "  command = mkdir -p $$(dirname \"$out\") && $cc $common_cppflags $common_cflags $mode_cflags $vendor_warnings -MMD -MF $out.d -c $in -o $out",
+        "rule cc",
+        '  command = mkdir -p $$(dirname "$out") && $cc $cppflags $cflags $mode_cflags $warnings -MMD -MF $out.d -c $in -o $out',
         "  depfile = $out.d",
         "  deps = gcc",
         "  description = CC $out",
         "",
         "rule ar",
-        "  command = mkdir -p $$(dirname \"$out\") && rm -f $out && $ar rcs $out $in",
+        '  command = mkdir -p $$(dirname "$out") && rm -f $out && $ar rcs $out $in',
         "  description = AR $out",
         "",
         "rule link",
-        "  command = mkdir -p $$(dirname \"$out\") && $cc $ldflags $in -o $out $ldlibs",
+        '  command = mkdir -p $$(dirname "$out") && $cc $ldflags $in -o $out $ldlibs',
         "  description = LINK $out",
         "",
         "rule clean",
@@ -125,37 +190,54 @@ def build_ninja_text() -> str:
         ("release", "$release_cflags", "$release_ldflags"),
         ("debug", "$debug_cflags", "$debug_ldflags"),
     ]:
-        lines.append(f"# {config}")
+        lines.append(f"# --- {config} ---")
+        archives = []
+
+        # Application objects
         app_objs = [obj_path(config, src) for src in APP_SRCS]
-        glfw_objs = [obj_path(config, src) for src in GLFW_SRCS]
-        glfw_lib = archive_path(config)
-        target = target_path(config)
-
         for src, obj in zip(APP_SRCS, app_objs):
-            lines.append(f"build {escape(obj)}: cc_app {escape(src)}")
+            lines.append(f"build {escape(obj)}: cc {escape(src)}")
+            lines.append(f"  cppflags = $cppflags")
+            lines.append(f"  cflags = $common_cflags")
             lines.append(f"  mode_cflags = {mode_cflags}")
+            lines.append(f"  warnings = $app_warnings")
 
-        for src, obj in zip(GLFW_SRCS, glfw_objs):
-            lines.append(f"build {escape(obj)}: cc_vendor {escape(src)}")
-            lines.append(f"  mode_cflags = {mode_cflags}")
+        # Vendor objects and archives
+        for lib in VENDOR_LIBS:
+            lib_objs = [obj_path(config, src) for src in lib["srcs"]]
+            lib_archive = archive_path(config, lib["name"])
 
-        lines.append(f"build {escape(glfw_lib)}: ar {join_paths(glfw_objs)}")
-        lines.append(f"build {escape(target)}: link {join_paths(app_objs + [glfw_lib])}")
+            cflags = lib.get("cflags", "$common_cflags")
+            for src, obj in zip(lib["srcs"], lib_objs):
+                lines.append(f"build {escape(obj)}: cc {escape(src)}")
+                lines.append(f"  cppflags = $cppflags")
+                lines.append(f"  cflags = {cflags}")
+                lines.append(f"  mode_cflags = {mode_cflags}")
+                lines.append(f"  warnings = $vendor_warnings")
+
+            lines.append(f"build {escape(lib_archive)}: ar {join(lib_objs)}")
+            archives.append(lib_archive)
+
+        # Link
+        target = target_path(config)
+        all_inputs = app_objs + archives
+        lines.append(f"build {escape(target)}: link {join(all_inputs)}")
         lines.append(f"  ldflags = {ldflags}")
         lines.append("")
 
-    lines.extend(
-        [
-            f"build {BUILD_DIR}/release: phony {escape(target_path('release'))}",
-            f"build {BUILD_DIR}/debug: phony {escape(target_path('debug'))}",
-            f"build release: phony {escape(target_path('release'))}",
-            f"build debug: phony {escape(target_path('debug'))}",
-            f"build all: phony {escape(target_path('release'))} {escape(target_path('debug'))}",
-            "build clean: clean",
-            f"default {escape(target_path('release'))}",
-            "",
-        ]
-    )
+    # Phony targets
+    release_target = escape(target_path("release"))
+    debug_target = escape(target_path("debug"))
+    lines.extend([
+        f"build {BUILD_DIR}/release: phony {release_target}",
+        f"build {BUILD_DIR}/debug: phony {debug_target}",
+        f"build release: phony {release_target}",
+        f"build debug: phony {debug_target}",
+        f"build all: phony {release_target} {debug_target}",
+        "build clean: clean",
+        f"default {release_target}",
+        "",
+    ])
 
     return "\n".join(lines) + "\n"
 
@@ -164,6 +246,7 @@ def main() -> None:
     root = Path(__file__).resolve().parent.parent
     output = root / "build.ninja"
     output.write_text(build_ninja_text(), encoding="ascii")
+    print(f"Generated {output}")
 
 
 if __name__ == "__main__":

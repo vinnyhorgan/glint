@@ -6,6 +6,9 @@
 
 #include <stdio.h>
 
+#include "pocketpy.h"
+#include "miniaudio.h"
+
 typedef struct Demo
 {
     GLuint program;
@@ -297,10 +300,35 @@ static void render_demo(const Demo* demo, int width, int height, float time)
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
+static void test_pocketpy(void)
+{
+    py_initialize();
+    py_GlobalRef module = py_getmodule("__main__");
+    if (!py_exec("print('pocketpy: hello from python')", "<test>", EXEC_MODE, module)) {
+        py_printexc();
+    }
+    py_finalize();
+}
+
+static void test_miniaudio(void)
+{
+    ma_engine engine;
+    ma_result result = ma_engine_init(NULL, &engine);
+    if (result == MA_SUCCESS) {
+        fprintf(stderr, "miniaudio: engine initialized ok\n");
+        ma_engine_uninit(&engine);
+    } else {
+        fprintf(stderr, "miniaudio: engine init failed (%d)\n", result);
+    }
+}
+
 int main(void)
 {
     Demo demo = {0};
     GLFWwindow* window;
+
+    test_pocketpy();
+    test_miniaudio();
 
     glfwSetErrorCallback(error_callback);
 
