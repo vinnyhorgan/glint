@@ -41,6 +41,11 @@ build build/release/obj/src/main.o: cc src/main.c
   cflags = $common_cflags
   mode_cflags = $release_cflags
   warnings = $app_warnings
+build build/release/obj/src/gl.o: cc src/gl.c
+  cppflags = $cppflags
+  cflags = $common_cflags
+  mode_cflags = $release_cflags
+  warnings = $app_warnings
 build build/release/obj/vendor/glfw/src/context.o: cc vendor/glfw/src/context.c
   cppflags = $cppflags
   cflags = $common_cflags
@@ -169,11 +174,16 @@ build build/release/obj/vendor/miniaudio/miniaudio.o: cc vendor/miniaudio/miniau
   mode_cflags = $release_cflags
   warnings = $vendor_warnings
 build build/release/libminiaudio.a: ar build/release/obj/vendor/miniaudio/miniaudio.o
-build build/glint: link build/release/obj/src/main.o build/release/libglfw.a build/release/libpocketpy.a build/release/libminiaudio.a
+build build/glint: link build/release/obj/src/main.o build/release/obj/src/gl.o build/release/libglfw.a build/release/libpocketpy.a build/release/libminiaudio.a
   ldflags = $release_ldflags
 
 # --- debug ---
 build build/debug/obj/src/main.o: cc src/main.c
+  cppflags = $cppflags
+  cflags = $common_cflags
+  mode_cflags = $debug_cflags
+  warnings = $app_warnings
+build build/debug/obj/src/gl.o: cc src/gl.c
   cppflags = $cppflags
   cflags = $common_cflags
   mode_cflags = $debug_cflags
@@ -306,7 +316,7 @@ build build/debug/obj/vendor/miniaudio/miniaudio.o: cc vendor/miniaudio/miniaudi
   mode_cflags = $debug_cflags
   warnings = $vendor_warnings
 build build/debug/libminiaudio.a: ar build/debug/obj/vendor/miniaudio/miniaudio.o
-build build/glint-debug: link build/debug/obj/src/main.o build/debug/libglfw.a build/debug/libpocketpy.a build/debug/libminiaudio.a
+build build/glint-debug: link build/debug/obj/src/main.o build/debug/obj/src/gl.o build/debug/libglfw.a build/debug/libpocketpy.a build/debug/libminiaudio.a
   ldflags = $debug_ldflags
 
 build build/release: phony build/glint

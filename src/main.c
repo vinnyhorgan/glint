@@ -1,385 +1,366 @@
-#define GLAD_GLES2_IMPLEMENTATION
 #include <glad/gles2.h>
-
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+#include "gl.h"
+
 #include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
 
 #include "pocketpy.h"
 #include "miniaudio.h"
 
-typedef struct Demo
+/* -------------------------------------------------------------------------- */
+/* Math helpers                                                               */
+/* -------------------------------------------------------------------------- */
+
+static void mat4_identity(float m[16])
 {
-    GLuint program;
-    GLuint vertex_shader;
-    GLuint fragment_shader;
-    GLuint quad_buffer;
-    GLint position_attrib;
-    GLint resolution_uniform;
-    GLint time_uniform;
+    for (int i = 0; i < 16; i++) m[i] = 0.0f;
+    m[0] = m[5] = m[10] = m[15] = 1.0f;
+}
+
+static void mat4_mul(const float a[16], const float b[16], float r[16])
+{
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            r[i*4+j] = a[i*4+0]*b[0*4+j]
+                     + a[i*4+1]*b[1*4+j]
+                     + a[i*4+2]*b[2*4+j]
+                     + a[i*4+3]*b[3*4+j];
+        }
+    }
+}
+
+static void mat4_perspective(float fovy, float aspect, float n, float f,
+                             float m[16])
+{
+    float ff = 1.0f / tanf(fovy * 0.5f);
+    m[0]  = ff / aspect; m[1]  = 0;   m[2]  = 0;                      m[3]  = 0;
+    m[4]  = 0;           m[5]  = ff;  m[6]  = 0;                      m[7]  = 0;
+    m[8]  = 0;           m[9]  = 0;   m[10] = (f+n)/(n-f);            m[11] = -1;
+    m[12] = 0;           m[13] = 0;   m[14] = (2.0f*f*n)/(n-f);       m[15] = 0;
+}
+
+static void mat4_rotate_x(float a, float m[16])
+{
+    float c = cosf(a), s = sinf(a);
+    mat4_identity(m);
+    m[5]  =  c; m[6]  = s;
+    m[9]  = -s; m[10] = c;
+}
+
+static void mat4_rotate_y(float a, float m[16])
+{
+    float c = cosf(a), s = sinf(a);
+    mat4_identity(m);
+    m[0]  = c; m[2]  = -s;
+    m[8]  = s; m[10] =  c;
+}
+
+static void mat4_translate(float x, float y, float z, float m[16])
+{
+    mat4_identity(m);
+    m[12] = x; m[13] = y; m[14] = z;
+}
+
+static void mat4_transform(const float m[16],
+                           float x, float y, float z, float w,
+                           float *ox, float *oy, float *oz, float *ow)
+{
+    *ox = m[0]*x + m[4]*y + m[8]*z  + m[12]*w;
+    *oy = m[1]*x + m[5]*y + m[9]*z  + m[13]*w;
+    *oz = m[2]*x + m[6]*y + m[10]*z + m[14]*w;
+    *ow = m[3]*x + m[7]*y + m[11]*z + m[15]*w;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Cube data                                                                  */
+/* -------------------------------------------------------------------------- */
+
+static const float kCube[8][3] = {
+    {-0.5f,-0.5f,-0.5f}, { 0.5f,-0.5f,-0.5f}, { 0.5f, 0.5f,-0.5f}, {-0.5f, 0.5f,-0.5f},
+    {-0.5f,-0.5f, 0.5f}, { 0.5f,-0.5f, 0.5f}, { 0.5f, 0.5f, 0.5f}, {-0.5f, 0.5f, 0.5f},
+};
+
+static const int kFaces[6][4] = {
+    {0,1,2,3}, {5,4,7,6}, {4,0,3,7}, {1,5,6,2}, {4,5,1,0}, {3,2,6,7},
+};
+
+static const float kUV[4][2] = { {0,0}, {1,0}, {1,1}, {0,1} };
+
+static const GrColor_t kFaceCol[6] = {
+    0xFFFF0000, 0xFF00FF00, 0xFF0000FF,
+    0xFFFFFF00, 0xFFFF00FF, 0xFF00FFFF,
+};
+
+/* -------------------------------------------------------------------------- */
+/* Texture generation                                                         */
+/* -------------------------------------------------------------------------- */
+
+static uint8_t *make_checker(int w, int h)
+{
+    uint8_t *p = (uint8_t *)malloc((size_t)w * h * 4);
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            int c = ((x >> 3) + (y >> 3)) & 1 ? 255 : 32;
+            p[(y*w+x)*4+0] = (uint8_t)((x*4) & 255);
+            p[(y*w+x)*4+1] = (uint8_t)c;
+            p[(y*w+x)*4+2] = (uint8_t)((y*4) & 255);
+            p[(y*w+x)*4+3] = 255;
+        }
+    }
+    return p;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Demo state                                                                 */
+/* -------------------------------------------------------------------------- */
+
+typedef struct {
+    int    tex;
+    int    blend_on;
+    int    cull_on;
+    double last_title;
+    int    frames;
 } Demo;
 
-static const GLchar* const kVertexShaderSource[] = {
-    "attribute vec2 a_pos;\n",
-    "varying vec2 v_uv;\n",
-    "\n",
-    "void main(void)\n",
-    "{\n",
-    "    v_uv = 0.5 * (a_pos + 1.0);\n",
-    "    gl_Position = vec4(a_pos, 0.0, 1.0);\n",
-    "}\n",
-};
+/* -------------------------------------------------------------------------- */
+/* Drawing                                                                    */
+/* -------------------------------------------------------------------------- */
 
-static const GLchar* const kFragmentShaderSource[] = {
-    "precision mediump float;\n",
-    "\n",
-    "varying vec2 v_uv;\n",
-    "uniform vec2 u_resolution;\n",
-    "uniform float u_time;\n",
-    "\n",
-    "float box(vec2 p, vec2 min_corner, vec2 max_corner)\n",
-    "{\n",
-    "    vec2 inside = step(min_corner, p) * step(p, max_corner);\n",
-    "    return inside.x * inside.y;\n",
-    "}\n",
-    "\n",
-    "float glyph_h(vec2 p)\n",
-    "{\n",
-    "    return max(max(box(p, vec2(0.06, 0.08), vec2(0.20, 0.92)),\n",
-    "                   box(p, vec2(0.80, 0.08), vec2(0.94, 0.92))),\n",
-    "               box(p, vec2(0.20, 0.44), vec2(0.80, 0.58)));\n",
-    "}\n",
-    "\n",
-    "float glyph_e(vec2 p)\n",
-    "{\n",
-    "    return max(max(box(p, vec2(0.08, 0.08), vec2(0.22, 0.92)),\n",
-    "                   box(p, vec2(0.22, 0.78), vec2(0.92, 0.92))),\n",
-    "               max(box(p, vec2(0.22, 0.44), vec2(0.76, 0.58)),\n",
-    "                   box(p, vec2(0.22, 0.08), vec2(0.92, 0.22))));\n",
-    "}\n",
-    "\n",
-    "float glyph_l(vec2 p)\n",
-    "{\n",
-    "    return max(box(p, vec2(0.08, 0.08), vec2(0.22, 0.92)),\n",
-    "               box(p, vec2(0.22, 0.08), vec2(0.90, 0.22)));\n",
-    "}\n",
-    "\n",
-    "float glyph_o(vec2 p)\n",
-    "{\n",
-    "    float outer = box(p, vec2(0.08, 0.08), vec2(0.92, 0.92));\n",
-    "    float inner = box(p, vec2(0.26, 0.24), vec2(0.74, 0.76));\n",
-    "    return max(0.0, outer - inner);\n",
-    "}\n",
-    "\n",
-    "float glyph_w(vec2 p)\n",
-    "{\n",
-    "    return max(max(box(p, vec2(0.04, 0.08), vec2(0.18, 0.92)),\n",
-    "                   box(p, vec2(0.82, 0.08), vec2(0.96, 0.92))),\n",
-    "               max(box(p, vec2(0.30, 0.08), vec2(0.44, 0.52)),\n",
-    "                   box(p, vec2(0.56, 0.08), vec2(0.70, 0.52))));\n",
-    "}\n",
-    "\n",
-    "float glyph_r(vec2 p)\n",
-    "{\n",
-    "    float stem = box(p, vec2(0.08, 0.08), vec2(0.22, 0.92));\n",
-    "    float top = box(p, vec2(0.22, 0.70), vec2(0.88, 0.92));\n",
-    "    float mid = box(p, vec2(0.22, 0.44), vec2(0.82, 0.58));\n",
-    "    float right = box(p, vec2(0.74, 0.58), vec2(0.88, 0.92));\n",
-    "    float leg = box(p, vec2(0.54, 0.08), vec2(0.70, 0.44));\n",
-    "    return max(max(stem, top), max(max(mid, right), leg));\n",
-    "}\n",
-    "\n",
-    "float glyph_d(vec2 p)\n",
-    "{\n",
-    "    float stem = box(p, vec2(0.08, 0.08), vec2(0.22, 0.92));\n",
-    "    float body = box(p, vec2(0.22, 0.08), vec2(0.88, 0.92));\n",
-    "    float cut = box(p, vec2(0.36, 0.24), vec2(0.70, 0.76));\n",
-    "    return max(stem, max(0.0, body - cut));\n",
-    "}\n",
-    "\n",
-    "float glyph_for_index(float index, vec2 p)\n",
-    "{\n",
-    "    if (index < 0.5)\n",
-    "        return glyph_h(p);\n",
-    "    if (index < 1.5)\n",
-    "        return glyph_e(p);\n",
-    "    if (index < 2.5)\n",
-    "        return glyph_l(p);\n",
-    "    if (index < 3.5)\n",
-    "        return glyph_l(p);\n",
-    "    if (index < 4.5)\n",
-    "        return glyph_o(p);\n",
-    "    if (index < 5.5)\n",
-    "        return glyph_w(p);\n",
-    "    if (index < 6.5)\n",
-    "        return glyph_o(p);\n",
-    "    if (index < 7.5)\n",
-    "        return glyph_r(p);\n",
-    "    if (index < 8.5)\n",
-    "        return glyph_l(p);\n",
-    "    return glyph_d(p);\n",
-    "}\n",
-    "\n",
-    "float hello_world(vec2 uv)\n",
-    "{\n",
-    "    const float count = 10.0;\n",
-    "    vec2 text_uv = (uv - vec2(0.12, 0.36)) / vec2(0.76, 0.18);\n",
-    "\n",
-    "    if (text_uv.x < 0.0 || text_uv.x > 1.0 || text_uv.y < 0.0 || text_uv.y > 1.0)\n",
-    "        return 0.0;\n",
-    "\n",
-    "    float slot = text_uv.x * count;\n",
-    "    float index = floor(slot);\n",
-    "    vec2 glyph_uv = vec2(fract(slot), text_uv.y);\n",
-    "\n",
-    "    if (index > 4.5)\n",
-    "        glyph_uv.x = (glyph_uv.x - 0.08) / 0.92;\n",
-    "\n",
-    "    if (glyph_uv.x < 0.0 || glyph_uv.x > 1.0)\n",
-    "        return 0.0;\n",
-    "\n",
-    "    return glyph_for_index(index, glyph_uv);\n",
-    "}\n",
-    "\n",
-    "void main(void)\n",
-    "{\n",
-    "    vec2 frag = gl_FragCoord.xy;\n",
-    "    vec2 uv = frag / u_resolution;\n",
-    "    vec2 p = (frag * 2.0 - u_resolution) / min(u_resolution.x, u_resolution.y);\n",
-    "    float time = u_time;\n",
-    "\n",
-    "    float radial = length(p);\n",
-    "    float sweep = 0.5 + 0.5 * sin(6.0 * radial - time * 2.8);\n",
-    "    float bloom = exp(-3.4 * radial);\n",
-    "    float grid = 0.5 + 0.5 * cos((p.x + p.y * 0.7) * 18.0 - time * 1.3);\n",
-    "\n",
-    "    vec3 base = vec3(0.02, 0.03, 0.06);\n",
-    "    vec3 dawn = vec3(0.14, 0.32, 0.74) * (0.35 + 0.65 * uv.y);\n",
-    "    vec3 neon = vec3(0.95, 0.38, 0.72) * sweep * bloom;\n",
-    "    vec3 aqua = vec3(0.20, 0.92, 0.88) * grid * 0.12;\n",
-    "    vec3 color = base + dawn + neon + aqua;\n",
-    "\n",
-    "    float halo = smoothstep(0.72, 0.08, radial);\n",
-    "    color += vec3(0.7, 0.4, 1.0) * halo * 0.08;\n",
-    "\n",
-    "    float title = hello_world(uv);\n",
-    "    float title_glow = smoothstep(0.0, 1.0, title) * (0.75 + 0.25 * sin(time * 2.0));\n",
-    "    color = mix(color, vec3(1.0, 0.97, 0.92), title);\n",
-    "    color += vec3(0.45, 0.85, 1.0) * title_glow * 0.24;\n",
-    "\n",
-    "    float vignette = smoothstep(1.3, 0.24, radial);\n",
-    "    color *= vignette;\n",
-    "\n",
-    "    gl_FragColor = vec4(color, 1.0);\n",
-    "}\n",
-};
-
-static const GLfloat kQuadVertices[] = {
-    -1.0f, -1.0f,
-     1.0f, -1.0f,
-    -1.0f,  1.0f,
-    -1.0f,  1.0f,
-     1.0f, -1.0f,
-     1.0f,  1.0f,
-};
-
-static void error_callback(int code, const char* description)
+static void draw_cube(const Demo *d, float t)
 {
-    fprintf(stderr, "GLFW error %d: %s\n", code, description);
-}
+    float proj[16], rx[16], ry[16], tr[16], mv[16], mvp[16], tmp[16];
 
-static GLADapiproc glfw_glad_loader(const char* name)
-{
-    return glfwGetProcAddress(name);
-}
+    mat4_perspective(60.0f * (float)M_PI / 180.0f,
+                     320.0f / 240.0f, 0.1f, 100.0f, proj);
+    mat4_rotate_x(t * 0.7f, rx);
+    mat4_rotate_y(t * 0.5f, ry);
+    mat4_translate(0.0f, 0.0f, -2.5f, tr);
 
-static GLuint compile_shader(GLenum type, const GLchar* const* source, GLsizei source_count)
-{
-    GLint compiled = GL_FALSE;
-    GLuint shader = glCreateShader(type);
+    mat4_mul(tr, ry, tmp);
+    mat4_mul(tmp, rx, mv);
+    mat4_mul(proj, mv, mvp);
 
-    glShaderSource(shader, source_count, source, NULL);
-    glCompileShader(shader);
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+    grCullMode(d->cull_on ? GR_CULL_NEGATIVE : GR_CULL_DISABLE);
+    grColorCombine(GR_COMBINE_MODE_MODULATE);
+    grAlphaCombine(GR_COMBINE_MODE_MODULATE);
+    grAlphaBlend(d->blend_on ? GR_BLEND_ALPHA : GR_BLEND_NONE);
+    grTexBind(d->tex);
 
-    if (!compiled)
-    {
-        GLint log_length = 0;
-        char log[1024];
+    for (int f = 0; f < 6; f++) {
+        float fr, fg, fb, fa;
+        grColorUnpack(kFaceCol[f], &fr, &fg, &fb, &fa);
 
-        glGetShaderInfoLog(shader, (GLsizei) sizeof(log), &log_length, log);
-        fprintf(stderr, "Shader compile failed: %.*s\n", log_length, log);
-        glDeleteShader(shader);
-        return 0;
+        for (int tri = 0; tri < 2; tri++) {
+            const int *idx = kFaces[f];
+            int i0 = idx[0];
+            int i1 = idx[tri+1];
+            int i2 = idx[tri+2];
+
+            GrVertex v[3];
+            for (int k = 0; k < 3; k++) {
+                int vi = (k==0)?i0:(k==1)?i1:i2;
+                float cx, cy, cz, cw;
+                mat4_transform(mvp,
+                               kCube[vi][0], kCube[vi][1], kCube[vi][2], 1.0f,
+                               &cx, &cy, &cz, &cw);
+                v[k].x   = cx;
+                v[k].y   = cy;
+                v[k].z   = cz;
+                v[k].oow = 1.0f / cw;
+                v[k].r   = fr;
+                v[k].g   = fg;
+                v[k].b   = fb;
+                v[k].a   = fa;
+                int uvi = (k==0)?0:(k==1)?(tri+1):(tri+2);
+                v[k].u   = kUV[uvi][0];
+                v[k].v   = kUV[uvi][1];
+            }
+            grDrawTriangle(&v[0], &v[1], &v[2]);
+        }
     }
-
-    return shader;
 }
 
-static GLuint link_program(GLuint vertex_shader, GLuint fragment_shader)
+static void draw_overlay(float t)
 {
-    GLint linked = GL_FALSE;
-    GLuint program = glCreateProgram();
+    grCullMode(GR_CULL_DISABLE);
+    grTexBind(-1);
+    grColorCombine(GR_COMBINE_MODE_MODULATE);
+    grAlphaCombine(GR_COMBINE_MODE_MODULATE);
+    grAlphaBlend(GR_BLEND_ALPHA);
 
-    glAttachShader(program, vertex_shader);
-    glAttachShader(program, fragment_shader);
-    glBindAttribLocation(program, 0, "a_pos");
-    glLinkProgram(program);
-    glGetProgramiv(program, GL_LINK_STATUS, &linked);
+    /* spinning triangle in top-left */
+    float cx = (30.0f / 160.0f) - 1.0f;
+    float cy = (30.0f / 120.0f) - 1.0f;
+    float s = 20.0f / 160.0f;
+    float c = cosf(t * 3.0f);
+    float sn = sinf(t * 3.0f);
 
-    if (!linked)
-    {
-        GLint log_length = 0;
-        char log[1024];
+    GrVertex v0 = { cx, cy, -0.9f, 1.0f, 1.0f, 1.0f, 1.0f, 0.8f, 0, 0 };
+    GrVertex v1 = { cx + s*c, cy + s*sn, -0.9f, 1.0f, 1.0f, 0.0f, 0.0f, 0.6f, 0, 0 };
+    GrVertex v2 = { cx - s*sn, cy + s*c, -0.9f, 1.0f, 0.0f, 1.0f, 0.0f, 0.6f, 0, 0 };
+    grDrawTriangle(&v0, &v1, &v2);
 
-        glGetProgramInfoLog(program, (GLsizei) sizeof(log), &log_length, log);
-        fprintf(stderr, "Program link failed: %.*s\n", log_length, log);
-        glDeleteProgram(program);
-        return 0;
-    }
+    /* pulsing quad in bottom-right */
+    float px = (280.0f / 160.0f) - 1.0f;
+    float py = (200.0f / 120.0f) - 1.0f;
+    float ps = (8.0f + 4.0f * sinf(t * 4.0f)) / 160.0f;
+    GrColor_t col = grColorPack(0.2f, 0.6f, 1.0f, 0.5f);
+    float r, g, b, a;
+    grColorUnpack(col, &r, &g, &b, &a);
 
-    return program;
+    GrVertex p0 = { px - ps, py - ps, -0.9f, 1.0f, r, g, b, a, 0, 0 };
+    GrVertex p1 = { px + ps, py - ps, -0.9f, 1.0f, r, g, b, a, 0, 0 };
+    GrVertex p2 = { px - ps, py + ps, -0.9f, 1.0f, r, g, b, a, 0, 0 };
+    GrVertex p3 = { px + ps, py + ps, -0.9f, 1.0f, r, g, b, a, 0, 0 };
+    grDrawTriangle(&p0, &p1, &p2);
+    grDrawTriangle(&p2, &p1, &p3);
 }
 
-static int init_demo(Demo* demo)
+/* -------------------------------------------------------------------------- */
+/* GLFW callbacks                                                             */
+/* -------------------------------------------------------------------------- */
+
+static void error_cb(int code, const char *desc)
 {
-    demo->vertex_shader = compile_shader(
-        GL_VERTEX_SHADER,
-        kVertexShaderSource,
-        (GLsizei) (sizeof(kVertexShaderSource) / sizeof(kVertexShaderSource[0])));
-    if (!demo->vertex_shader)
-        return 0;
-
-    demo->fragment_shader = compile_shader(
-        GL_FRAGMENT_SHADER,
-        kFragmentShaderSource,
-        (GLsizei) (sizeof(kFragmentShaderSource) / sizeof(kFragmentShaderSource[0])));
-    if (!demo->fragment_shader)
-        return 0;
-
-    demo->program = link_program(demo->vertex_shader, demo->fragment_shader);
-    if (!demo->program)
-        return 0;
-
-    demo->position_attrib = glGetAttribLocation(demo->program, "a_pos");
-    demo->resolution_uniform = glGetUniformLocation(demo->program, "u_resolution");
-    demo->time_uniform = glGetUniformLocation(demo->program, "u_time");
-
-    glGenBuffers(1, &demo->quad_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, demo->quad_buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(kQuadVertices), kQuadVertices, GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    return 1;
+    fprintf(stderr, "GLFW error %d: %s\n", code, desc);
 }
 
-static void destroy_demo(Demo* demo)
+static void key_cb(GLFWwindow *win, int key, int scancode, int action,
+                   int mods)
 {
-    if (demo->quad_buffer)
-        glDeleteBuffers(1, &demo->quad_buffer);
-    if (demo->program)
-        glDeleteProgram(demo->program);
-    if (demo->fragment_shader)
-        glDeleteShader(demo->fragment_shader);
-    if (demo->vertex_shader)
-        glDeleteShader(demo->vertex_shader);
+    (void)scancode; (void)mods;
+    Demo *d = (Demo *)glfwGetWindowUserPointer(win);
+    if (action != GLFW_PRESS && action != GLFW_REPEAT) return;
+    if (key == GLFW_KEY_ESCAPE)
+        glfwSetWindowShouldClose(win, 1);
+    else if (key == GLFW_KEY_B)
+        d->blend_on = !d->blend_on;
+    else if (key == GLFW_KEY_C)
+        d->cull_on = !d->cull_on;
 }
 
-static void render_demo(const Demo* demo, int width, int height, float time)
-{
-    glViewport(0, 0, width, height);
-    glUseProgram(demo->program);
-    glUniform2f(demo->resolution_uniform, (GLfloat) width, (GLfloat) height);
-    glUniform1f(demo->time_uniform, time);
-
-    glBindBuffer(GL_ARRAY_BUFFER, demo->quad_buffer);
-    glEnableVertexAttribArray((GLuint) demo->position_attrib);
-    glVertexAttribPointer((GLuint) demo->position_attrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glDisableVertexAttribArray((GLuint) demo->position_attrib);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
+/* -------------------------------------------------------------------------- */
+/* Vendor tests                                                               */
+/* -------------------------------------------------------------------------- */
 
 static void test_pocketpy(void)
 {
     py_initialize();
-    py_GlobalRef module = py_getmodule("__main__");
-    if (!py_exec("print('pocketpy: hello from python')", "<test>", EXEC_MODE, module)) {
+    py_GlobalRef mod = py_getmodule("__main__");
+    if (!py_exec("print('pocketpy OK')", "<test>", EXEC_MODE, mod))
         py_printexc();
-    }
     py_finalize();
 }
 
 static void test_miniaudio(void)
 {
-    ma_engine engine;
-    ma_result result = ma_engine_init(NULL, &engine);
-    if (result == MA_SUCCESS) {
-        fprintf(stderr, "miniaudio: engine initialized ok\n");
-        ma_engine_uninit(&engine);
+    ma_engine e;
+    if (ma_engine_init(NULL, &e) == MA_SUCCESS) {
+        fprintf(stderr, "miniaudio OK\n");
+        ma_engine_uninit(&e);
     } else {
-        fprintf(stderr, "miniaudio: engine init failed (%d)\n", result);
+        fprintf(stderr, "miniaudio init failed\n");
     }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Main                                                                       */
+/* -------------------------------------------------------------------------- */
+
+static GLADapiproc glad_loader(const char *name)
+{
+    return glfwGetProcAddress(name);
 }
 
 int main(void)
 {
+    GLFWwindow *win;
     Demo demo = {0};
-    GLFWwindow* window;
 
     test_pocketpy();
     test_miniaudio();
 
-    glfwSetErrorCallback(error_callback);
-
-    if (!glfwInit())
-        return 1;
+    glfwSetErrorCallback(error_cb);
+    if (!glfwInit()) return 1;
 
     glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
-    window = glfwCreateWindow(1120, 700, "glint hello world", NULL, NULL);
-    if (!window)
-    {
+    win = glfwCreateWindow(960, 720, "glint – press B=blend C=cull ESC=quit",
+                           NULL, NULL);
+    if (!win) {
         glfwTerminate();
         return 1;
     }
 
-    glfwMakeContextCurrent(window);
-
-    if (!gladLoadGLES2(glfw_glad_loader))
-    {
-        fprintf(stderr, "Failed to load OpenGL ES 2.0 entry points via glad\n");
-        glfwDestroyWindow(window);
-        glfwTerminate();
-        return 1;
-    }
-
-    if (!init_demo(&demo))
-    {
-        destroy_demo(&demo);
-        glfwDestroyWindow(window);
-        glfwTerminate();
-        return 1;
-    }
-
+    glfwMakeContextCurrent(win);
+    glfwSetWindowUserPointer(win, &demo);
+    glfwSetKeyCallback(win, key_cb);
     glfwSwapInterval(1);
 
-    while (!glfwWindowShouldClose(window))
-    {
-        int width;
-        int height;
+    if (!gladLoadGLES2(glad_loader)) {
+        fprintf(stderr, "gladLoadGLES2 failed\n");
+        glfwDestroyWindow(win);
+        glfwTerminate();
+        return 1;
+    }
 
-        glfwGetFramebufferSize(window, &width, &height);
-        render_demo(&demo, width, height, (float) glfwGetTime());
-        glfwSwapBuffers(window);
+    if (!grInit(960, 720)) {
+        fprintf(stderr, "grInit failed\n");
+        glfwDestroyWindow(win);
+        glfwTerminate();
+        return 1;
+    }
+
+    /* create test texture */
+    demo.tex = grTexAllocate();
+    if (demo.tex >= 0) {
+        uint8_t *chk = make_checker(64, 64);
+        grTexDownloadMipMap(demo.tex, chk, 64, 64, GR_TEXFMT_ARGB_8888);
+        grTexFilter(demo.tex, GR_MIPMAP_NEAREST,
+                    GR_TEXTUREFILTER_BILINEAR, GR_TEXTUREFILTER_BILINEAR);
+        free(chk);
+    }
+
+    while (!glfwWindowShouldClose(win)) {
+        double now = glfwGetTime();
+        float t = (float)now;
+
+        int fw = 0, fh = 0;
+        glfwGetFramebufferSize(win, &fw, &fh);
+
+        grBufferClear(0xFF101020, 0xFFFF);
+        draw_cube(&demo, t);
+        draw_overlay(t);
+        grBufferSwap(win);
+
+        /* FPS */
+        demo.frames++;
+        if (now - demo.last_title >= 1.0) {
+            char buf[128];
+            snprintf(buf, sizeof(buf),
+                     "glint – %d FPS | B=blend(%s) C=cull(%s) | %dx%d",
+                     demo.frames,
+                     demo.blend_on ? "on" : "off",
+                     demo.cull_on  ? "on" : "off",
+                     fw, fh);
+            glfwSetWindowTitle(win, buf);
+            demo.frames = 0;
+            demo.last_title = now;
+        }
+
         glfwPollEvents();
     }
 
-    destroy_demo(&demo);
-    glfwDestroyWindow(window);
+    grTexFree(demo.tex);
+    grShutdown();
+    glfwDestroyWindow(win);
     glfwTerminate();
     return 0;
 }

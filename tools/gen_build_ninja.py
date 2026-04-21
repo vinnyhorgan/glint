@@ -15,6 +15,7 @@ BUILD_DIR = "build"
 
 APP_SRCS = [
     "src/main.c",
+    "src/gl.c",
 ]
 
 VENDOR_LIBS = [
