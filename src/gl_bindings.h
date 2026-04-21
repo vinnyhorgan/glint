@@ -10,6 +10,7 @@ typedef struct GlBindingHost {
     double (*time_now)(void *userdata);
     double (*delta_time)(void *userdata);
     int (*key_down)(void *userdata, int key);
+    int (*key_pressed)(void *userdata, int key);
     int (*mouse_down)(void *userdata, int button);
     void (*mouse_position)(void *userdata, float *x, float *y);
     void (*framebuffer_size)(void *userdata, int *w, int *h);

@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "pocketpy.h"
 
@@ -17,9 +18,19 @@ typedef struct {
     GLFWwindow *window;
     double time_now;
     double delta_time;
+    unsigned char pressed_keys[GLFW_KEY_LAST + 1];
 } RuntimeHost;
 
+typedef struct {
+    py_TValue keydown_func;
+    py_TValue keyup_func;
+    int has_keydown;
+    int has_keyup;
+} RuntimeScriptHooks;
+
 static int g_needs_resize_repaint;
+static RuntimeHost *g_runtime_host;
+static RuntimeScriptHooks g_script_hooks;
 
 static void present_black(GLFWwindow *window)
 {
@@ -64,6 +75,14 @@ static int host_key_down(void *userdata, int key)
     return glfwGetKey(host->window, key) == GLFW_PRESS;
 }
 
+static int host_key_pressed(void *userdata, int key)
+{
+    RuntimeHost *host = (RuntimeHost *)userdata;
+    if (key < 0 || key > GLFW_KEY_LAST)
+        return 0;
+    return host->pressed_keys[key] != 0;
+}
+
 static int host_mouse_down(void *userdata, int button)
 {
     RuntimeHost *host = (RuntimeHost *)userdata;
@@ -75,6 +94,8 @@ static void host_mouse_position(void *userdata, float *x, float *y)
     RuntimeHost *host = (RuntimeHost *)userdata;
     int win_w = 0;
     int win_h = 0;
+    int fb_w = 0;
+    int fb_h = 0;
     int view_x = 0;
     int view_y = 0;
     int view_w = 0;
@@ -83,9 +104,15 @@ static void host_mouse_position(void *userdata, float *x, float *y)
     double my = 0.0;
 
     glfwGetWindowSize(host->window, &win_w, &win_h);
+    glfwGetFramebufferSize(host->window, &fb_w, &fb_h);
     glfwGetCursorPos(host->window, &mx, &my);
 
-    grCoreComputeBlitRect(win_w, win_h, &view_x, &view_y, &view_w, &view_h);
+    if (win_w > 0 && win_h > 0) {
+        mx *= (double)fb_w / (double)win_w;
+        my *= (double)fb_h / (double)win_h;
+    }
+
+    grCoreComputeBlitRect(fb_w, fb_h, &view_x, &view_y, &view_w, &view_h);
     if (view_w <= 0 || view_h <= 0) {
         *x = 0.0f;
         *y = 0.0f;
@@ -125,12 +152,76 @@ static void host_request_quit(void *userdata)
     glfwSetWindowShouldClose(host->window, 1);
 }
 
+static const char *normalize_key_name(int key, char out[2])
+{
+    if (key >= GLFW_KEY_A && key <= GLFW_KEY_Z) {
+        out[0] = (char)('a' + (key - GLFW_KEY_A));
+        out[1] = '\0';
+        return out;
+    }
+    if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9) {
+        out[0] = (char)('0' + (key - GLFW_KEY_0));
+        out[1] = '\0';
+        return out;
+    }
+
+    switch (key) {
+        case GLFW_KEY_SPACE: return "space";
+        case GLFW_KEY_ENTER: return "enter";
+        case GLFW_KEY_ESCAPE: return "escape";
+        case GLFW_KEY_TAB: return "tab";
+        case GLFW_KEY_LEFT: return "left";
+        case GLFW_KEY_RIGHT: return "right";
+        case GLFW_KEY_UP: return "up";
+        case GLFW_KEY_DOWN: return "down";
+        case GLFW_KEY_LEFT_SHIFT:
+        case GLFW_KEY_RIGHT_SHIFT:
+            return "shift";
+        case GLFW_KEY_LEFT_CONTROL:
+        case GLFW_KEY_RIGHT_CONTROL:
+            return "ctrl";
+        case GLFW_KEY_LEFT_ALT:
+        case GLFW_KEY_RIGHT_ALT:
+            return "alt";
+        default:
+            return NULL;
+    }
+}
+
+static int call_python1s(py_Ref func, const char *value, const char *label)
+{
+    py_TValue arg;
+    py_newstr(&arg, value);
+    if (!py_call(func, 1, &arg)) {
+        fprintf(stderr, "%s failed\n", label);
+        py_printexc();
+        return 0;
+    }
+    return 1;
+}
+
+static void dispatch_key_event(py_Ref func, const char *label, int key)
+{
+    char key_name[2];
+    const char *name = normalize_key_name(key, key_name);
+
+    if (name == NULL)
+        return;
+    call_python1s(func, name, label);
+}
+
 static void key_cb(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
     (void)scancode;
     (void)mods;
+    if (g_runtime_host != NULL && action == GLFW_PRESS && key >= 0 && key <= GLFW_KEY_LAST)
+        g_runtime_host->pressed_keys[key] = 1;
     if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE)
         glfwSetWindowShouldClose(window, 1);
+    if (action == GLFW_PRESS && g_script_hooks.has_keydown)
+        dispatch_key_event(&g_script_hooks.keydown_func, "keydown(key)", key);
+    if (action == GLFW_RELEASE && g_script_hooks.has_keyup)
+        dispatch_key_event(&g_script_hooks.keyup_func, "keyup(key)", key);
 }
 
 static void framebuffer_size_cb(GLFWwindow *window, int width, int height)
@@ -224,6 +315,17 @@ static int load_runtime_script(const char *path, py_Ref module)
     return 1;
 }
 
+static int load_optional_hook(py_Ref module, const char *name, py_TValue *out)
+{
+    if (!py_getattr(module, py_name(name))) {
+        py_clearexc(NULL);
+        memset(out, 0, sizeof(*out));
+        return 0;
+    }
+    py_assign(out, py_retval());
+    return 1;
+}
+
 int main(int argc, char **argv)
 {
     const char *script_path = argc > 1 ? argv[1] : DEFAULT_SCRIPT_PATH;
@@ -278,6 +380,7 @@ int main(int argc, char **argv)
     binding_host.time_now = host_time_now;
     binding_host.delta_time = host_delta_time;
     binding_host.key_down = host_key_down;
+    binding_host.key_pressed = host_key_pressed;
     binding_host.mouse_down = host_mouse_down;
     binding_host.mouse_position = host_mouse_position;
     binding_host.framebuffer_size = host_framebuffer_size;
@@ -319,10 +422,15 @@ int main(int argc, char **argv)
     if (!call_python0(&load_func, "load()"))
         goto cleanup_python;
 
+    g_runtime_host = &host;
+    g_script_hooks.has_keydown = load_optional_hook(main_mod, "keydown", &g_script_hooks.keydown_func);
+    g_script_hooks.has_keyup = load_optional_hook(main_mod, "keyup", &g_script_hooks.keyup_func);
+
     last_time = glfwGetTime();
     while (!glfwWindowShouldClose(window)) {
         double now;
 
+        memset(host.pressed_keys, 0, sizeof(host.pressed_keys));
         glfwPollEvents();
         if (g_needs_resize_repaint) {
             present_black(window);
@@ -349,6 +457,8 @@ int main(int argc, char **argv)
     exit_code = 0;
 
 cleanup_python:
+    g_runtime_host = NULL;
+    memset(&g_script_hooks, 0, sizeof(g_script_hooks));
     py_finalize();
     glBindingsSetHost(NULL);
     grShutdown();

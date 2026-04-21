@@ -59,12 +59,28 @@ static const char *kBindingsBootstrap[] = {
     "def vertex(x, y, z=0.0, oow=1.0, color=(1.0, 1.0, 1.0, 1.0), u=0.0, v=0.0):\n"
     "    return Vertex(x, y, z, oow, color, u, v)\n"
     "\n"
+    "def _color_component(value):\n"
+    "    if value > 1.0 or value < 0.0:\n"
+    "        return value / 255.0\n"
+    "    return value\n"
+    "\n"
     "def _coerce_vertex(v):\n"
     "    if isinstance(v, Vertex):\n"
     "        return v.as_tuple()\n"
-    "    if len(v) == 10:\n"
+    "    n = len(v)\n"
+    "    if n == 2:\n"
+    "        return (v[0], v[1], 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0)\n"
+    "    if n == 4:\n"
+    "        return (v[0], v[1], 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, v[2], v[3])\n"
+    "    if n == 5:\n"
+    "        return (v[0], v[1], 0.0, 1.0, _color_component(v[2]), _color_component(v[3]), _color_component(v[4]), 1.0, 0.0, 0.0)\n"
+    "    if n == 7:\n"
+    "        return (v[0], v[1], 0.0, 1.0, _color_component(v[2]), _color_component(v[3]), _color_component(v[4]), 1.0, v[5], v[6])\n"
+    "    if n == 8:\n"
+    "        return (v[0], v[1], v[2], 1.0, _color_component(v[3]), _color_component(v[4]), _color_component(v[5]), 1.0, v[6], v[7])\n"
+    "    if n == 10:\n"
     "        return v\n"
-    "    raise ValueError('vertex must be glide.Vertex or a 10-item sequence')\n"
+    "    raise ValueError('vertex must be glide.Vertex or a 2/4/5/7/8/10-item sequence')\n"
     "\n"
     "def clear(color=(0.0, 0.0, 0.0, 1.0), depth=0xFFFF):\n"
     "    r, g, b, a = _unpack_rgba(color)\n"
@@ -102,7 +118,6 @@ static const char *kBindingsBootstrap[] = {
     "    q2 = vertex(x + w, y + h, z, 1.0, color, u1, v1)\n"
     "    q3 = vertex(x, y + h, z, 1.0, color, u0, v1)\n"
     "    quad(q0, q1, q2, q3)\n"
-    "    set_untextured()\n"
     "\n"
     "def upload_texture(width, height, pixels, fmt=None, mipmap=None, min_filter=None, mag_filter=None, s_clamp=None, t_clamp=None):\n"
     "    if fmt is None:\n"
@@ -153,7 +168,52 @@ static const char *kBindingsBootstrap[] = {
     "    alpha_blend_function(BLEND_SRC_ALPHA, BLEND_ONE_MINUS_SRC_ALPHA, BLEND_ONE, BLEND_ONE_MINUS_SRC_ALPHA)\n"
     "\n"
     "def set_blend_add():\n"
-    "    alpha_blend_function(BLEND_SRC_ALPHA, BLEND_ONE, BLEND_ONE, BLEND_ONE)\n",
+    "    alpha_blend_function(BLEND_SRC_ALPHA, BLEND_ONE, BLEND_ONE, BLEND_ONE)\n"
+    "\n",
+    "def set_mode(mode):\n"
+    "    if mode == 'flat':\n"
+    "        tex_bind(-1)\n"
+    "        color_combine(COMBINE_FUNCTION_LOCAL, COMBINE_FACTOR_NONE, COMBINE_LOCAL_CONSTANT, COMBINE_OTHER_NONE, False)\n"
+    "        alpha_combine(COMBINE_FUNCTION_LOCAL, COMBINE_FACTOR_NONE, COMBINE_LOCAL_CONSTANT, COMBINE_OTHER_NONE, False)\n"
+    "        set_blend_none()\n"
+    "        return\n"
+    "    if mode == 'gouraud':\n"
+    "        set_untextured()\n"
+    "        set_blend_none()\n"
+    "        return\n"
+    "    if mode == 'textured':\n"
+    "        color_combine(COMBINE_FUNCTION_SCALE_OTHER, COMBINE_FACTOR_LOCAL, COMBINE_LOCAL_CONSTANT, COMBINE_OTHER_TEXTURE, False)\n"
+    "        alpha_combine(COMBINE_FUNCTION_SCALE_OTHER, COMBINE_FACTOR_LOCAL_ALPHA, COMBINE_LOCAL_CONSTANT, COMBINE_OTHER_TEXTURE, False)\n"
+    "        set_blend_none()\n"
+    "        return\n"
+    "    if mode == 'textured_gouraud':\n"
+    "        set_textured_modulate()\n"
+    "        set_blend_none()\n"
+    "        return\n"
+    "    if mode == 'transparent':\n"
+    "        set_textured_modulate()\n"
+    "        set_blend_alpha()\n"
+    "        return\n"
+    "    raise ValueError('unknown mode: ' + str(mode))\n"
+    "\n",
+    "def begin_2d():\n"
+    "    viewport(0, 0, FB_W, FB_H)\n"
+    "    clip_window(0, 0, FB_W, FB_H)\n"
+    "    depth_buffer_mode(DEPTHBUFFER_DISABLE)\n"
+    "    depth_mask(False)\n"
+    "\n"
+    "def begin_3d():\n"
+    "    viewport(0, 0, FB_W, FB_H)\n"
+    "    clip_window(0, 0, FB_W, FB_H)\n"
+    "    depth_buffer_mode(DEPTHBUFFER_ZBUFFER)\n"
+    "    depth_buffer_function(CMP_LESS)\n"
+    "    depth_mask(True)\n"
+    "\n",
+    "def mouse_x():\n"
+    "    return mouse_position()[0]\n"
+    "\n"
+    "def mouse_y():\n"
+    "    return mouse_position()[1]\n",
 };
 
 static bool exec_bootstrap(py_Ref module)
@@ -307,16 +367,47 @@ static bool parse_vertex(py_Ref obj, GrVertex *out)
     float values[10];
     int len = seq_len(obj);
     int i;
+    memset(out, 0, sizeof(*out));
+    out->oow = 1.0f;
+    out->r = 1.0f;
+    out->g = 1.0f;
+    out->b = 1.0f;
+    out->a = 1.0f;
     if (len < 0)
-        return TypeError("expected a 10-item list or tuple for a vertex");
-    if (len != 10)
-        return ValueError("expected a 10-item vertex sequence, got %d items", len);
-    for (i = 0; i < 10; ++i) {
+        return TypeError("expected a list or tuple for a vertex");
+    if (len != 2 && len != 4 && len != 5 && len != 7 && len != 8 && len != 10)
+        return ValueError("expected a 2/4/5/7/8/10-item vertex sequence, got %d items", len);
+    for (i = 0; i < len; ++i) {
         if (!cast_float_ref(seq_getitem(obj, i), &values[i]))
             return TypeError("vertex element %d must be numeric", i);
     }
+
     out->x = values[0];
     out->y = values[1];
+    if (len == 2)
+        return true;
+    if (len == 4) {
+        out->u = values[2];
+        out->v = values[3];
+        return true;
+    }
+    if (len == 5 || len == 7 || len == 8) {
+        int color_index = len == 8 ? 3 : 2;
+        out->r = values[color_index + 0] > 1.0f ? values[color_index + 0] / 255.0f : values[color_index + 0];
+        out->g = values[color_index + 1] > 1.0f ? values[color_index + 1] / 255.0f : values[color_index + 1];
+        out->b = values[color_index + 2] > 1.0f ? values[color_index + 2] / 255.0f : values[color_index + 2];
+        if (len == 8)
+            out->z = values[2];
+        if (len == 7) {
+            out->u = values[5];
+            out->v = values[6];
+        } else if (len == 8) {
+            out->u = values[6];
+            out->v = values[7];
+        }
+        return true;
+    }
+
     out->z = values[2];
     out->oow = values[3];
     out->r = values[4];
@@ -468,6 +559,16 @@ static bool py_key_down(int argc, py_StackRef argv)
     if (!parse_key_code(py_arg(0), &key))
         return TypeError("key must be a keycode int or key name string");
     py_newbool(py_retval(), g_host.key_down != NULL && g_host.key_down(g_host.userdata, key));
+    return true;
+}
+
+static bool py_key_pressed(int argc, py_StackRef argv)
+{
+    int key = 0;
+    (void)argc;
+    if (!parse_key_code(py_arg(0), &key))
+        return TypeError("key must be a keycode int or key name string");
+    py_newbool(py_retval(), g_host.key_pressed != NULL && g_host.key_pressed(g_host.userdata, key));
     return true;
 }
 
@@ -771,12 +872,12 @@ static bool py_tex_download_mipmap(int argc, py_StackRef argv)
         || !cast_int_arg(2, argv, &h) || !cast_int_arg(3, argv, &fmt))
         return false;
     if (w <= 0 || h <= 0)
-        return false;
+        return ValueError("texture width and height must be positive");
     count = w * h;
     if ((GrTextureFormat)fmt == GR_TEXFMT_RGB_565 || (GrTextureFormat)fmt == GR_TEXFMT_ARGB_1555) {
         uint16_t *tmp = (uint16_t *)malloc((size_t)count * sizeof(uint16_t));
         if (tmp == NULL)
-            return false;
+            return RuntimeError("out of memory while decoding texture upload");
         if (!parse_u16_list(py_arg(4), tmp, count)) {
             free(tmp);
             return false;
@@ -785,14 +886,14 @@ static bool py_tex_download_mipmap(int argc, py_StackRef argv)
     } else if ((GrTextureFormat)fmt == GR_TEXFMT_ARGB_8888) {
         uint8_t *tmp = (uint8_t *)malloc((size_t)count * 4u);
         if (tmp == NULL)
-            return false;
+            return RuntimeError("out of memory while decoding texture upload");
         if (!parse_byte_list(py_arg(4), tmp, count * 4)) {
             free(tmp);
             return false;
         }
         pixels = tmp;
     } else {
-        return false;
+        return ValueError("unsupported texture format: %d", fmt);
     }
     grTexDownloadMipMap(tex, pixels, w, h, (GrTextureFormat)fmt);
     free(pixels);
@@ -879,6 +980,7 @@ bool glBindingsRegister(py_Ref module)
     py_bind(module, "time()", py_time_now);
     py_bind(module, "dt()", py_delta_time);
     py_bind(module, "key_down(key)", py_key_down);
+    py_bind(module, "key_pressed(key)", py_key_pressed);
     py_bind(module, "mouse_down(button)", py_mouse_down);
     py_bind(module, "mouse_position()", py_mouse_position);
     py_bind(module, "screen_size()", py_screen_size);
@@ -984,6 +1086,11 @@ bool glBindingsRegister(py_Ref module)
 
     set_module_int(module, "SHADE_FLAT", GR_SHADE_FLAT);
     set_module_int(module, "SHADE_GOURAUD", GR_SHADE_GOURAUD);
+    set_module_int(module, "SHADE_COLOR", GR_SHADE_COLOR);
+    set_module_int(module, "SHADE_ALPHA", GR_SHADE_ALPHA);
+    set_module_int(module, "SHADE_ST", GR_SHADE_ST);
+    set_module_int(module, "SHADE_Z", GR_SHADE_Z);
+    set_module_int(module, "SHADE_W", GR_SHADE_W);
 
     set_module_int(module, "TEXFMT_RGB_565", GR_TEXFMT_RGB_565);
     set_module_int(module, "TEXFMT_ARGB_1555", GR_TEXFMT_ARGB_1555);

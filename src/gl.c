@@ -33,6 +33,7 @@ typedef struct {
     int width;
     int height;
     bool allocated;
+    bool has_mipmaps;
     GrMipMapMode mipmap_mode;
     GrTextureFilter min_filter;
     GrTextureFilter mag_filter;
@@ -66,6 +67,8 @@ typedef struct {
     GLint render_u_fog_table;
     GLint render_u_alpha_test_func;
     GLint render_u_alpha_ref;
+    GLint render_u_viewport_origin;
+    GLint render_u_viewport_size;
     GLint blit_u_tex;
     TextureSlot textures[GR_MAX_TEXTURES];
     BatchVertex batch[8192];
@@ -90,10 +93,13 @@ static const char *kRenderVs[] = {
     "varying vec4 v_color;\n"
     "varying vec2 v_uv;\n"
     "varying float v_oow;\n"
+    "uniform vec2 u_viewport_origin;\n"
+    "uniform vec2 u_viewport_size;\n"
     "void main() {\n"
-    "  float ndc_x = (a_pos.x / 160.0) - 1.0;\n"
-    "  float ndc_y = 1.0 - (a_pos.y / 120.0);\n"
+    "  float ndc_x = ((a_pos.x - u_viewport_origin.x) / u_viewport_size.x) * 2.0 - 1.0;\n"
+    "  float ndc_y = 1.0 - ((a_pos.y - u_viewport_origin.y) / u_viewport_size.y) * 2.0;\n"
     "  gl_Position = vec4(ndc_x, ndc_y, a_pos.z * 2.0 - 1.0, 1.0);\n"
+    "  gl_PointSize = 1.0;\n"
     "  v_color = a_color;\n"
     "  v_uv = a_uv;\n"
     "  v_oow = a_pos.w;\n"
@@ -328,7 +334,7 @@ static GLenum map_cmp_func(GrCmpFnc_t func)
     }
 }
 
-static GLenum map_blend_func(GrAlphaBlendFnc_t func)
+static GLenum map_blend_func(GrAlphaBlendFnc_t func, bool allow_alpha_saturate)
 {
     switch (func) {
         case GR_BLEND_ZERO: return GL_ZERO;
@@ -341,7 +347,7 @@ static GLenum map_blend_func(GrAlphaBlendFnc_t func)
         case GR_BLEND_ONE_MINUS_SRC_ALPHA: return GL_ONE_MINUS_SRC_ALPHA;
         case GR_BLEND_DST_ALPHA: return GL_DST_ALPHA;
         case GR_BLEND_ONE_MINUS_DST_ALPHA: return GL_ONE_MINUS_DST_ALPHA;
-        case GR_BLEND_ALPHA_SATURATE: return GL_SRC_ALPHA_SATURATE;
+        case GR_BLEND_ALPHA_SATURATE: return allow_alpha_saturate ? GL_SRC_ALPHA_SATURATE : GL_ONE;
         default: return GL_ONE;
     }
 }
@@ -354,6 +360,16 @@ static GLenum map_texture_filter(GrTextureFilter filter)
 static GLenum map_wrap_mode(GrTextureClampMode clamp_mode)
 {
     return clamp_mode == GR_TEXTURECLAMP_CLAMP ? GL_CLAMP_TO_EDGE : GL_REPEAT;
+}
+
+static int viewport_width(void)
+{
+    return g_gl.viewport_w > 0 ? g_gl.viewport_w : 1;
+}
+
+static int viewport_height(void)
+{
+    return g_gl.viewport_h > 0 ? g_gl.viewport_h : 1;
 }
 
 static void set_scissor_rect(void)
@@ -374,7 +390,7 @@ static void apply_texture_params(int tex)
 
     slot = &g_gl.textures[tex];
     glBindTexture(GL_TEXTURE_2D, slot->id);
-    if (slot->mipmap_mode == GR_MIPMAP_DISABLE) {
+    if (slot->mipmap_mode == GR_MIPMAP_DISABLE || !slot->has_mipmaps) {
         min_filter = map_texture_filter(slot->min_filter);
     } else {
         min_filter = slot->min_filter == GR_TEXTUREFILTER_BILINEAR
@@ -386,6 +402,22 @@ static void apply_texture_params(int tex)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLint)map_texture_filter(slot->mag_filter));
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, (GLint)map_wrap_mode(slot->s_clamp));
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, (GLint)map_wrap_mode(slot->t_clamp));
+}
+
+static void ensure_texture_mipmaps(int tex)
+{
+    TextureSlot *slot;
+
+    if (tex < 0 || tex >= GR_MAX_TEXTURES || !g_gl.textures[tex].allocated)
+        return;
+
+    slot = &g_gl.textures[tex];
+    if (slot->mipmap_mode == GR_MIPMAP_DISABLE || slot->width <= 0 || slot->height <= 0)
+        return;
+
+    glBindTexture(GL_TEXTURE_2D, slot->id);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    slot->has_mipmaps = true;
 }
 
 static void apply_depth_state(void)
@@ -408,10 +440,10 @@ static void apply_blend_state(void)
     }
 
     glEnable(GL_BLEND);
-    glBlendFuncSeparate(map_blend_func(g_gl.core.rgb_sf),
-                        map_blend_func(g_gl.core.rgb_df),
-                        map_blend_func(g_gl.core.alpha_sf),
-                        map_blend_func(g_gl.core.alpha_df));
+    glBlendFuncSeparate(map_blend_func(g_gl.core.rgb_sf, true),
+                        map_blend_func(g_gl.core.rgb_df, false),
+                        map_blend_func(g_gl.core.alpha_sf, false),
+                        map_blend_func(g_gl.core.alpha_df, false));
 }
 
 static void apply_uniforms(void)
@@ -445,6 +477,94 @@ static void apply_uniforms(void)
     glUniform1fv(g_gl.render_u_fog_table, GR_FOG_TABLE_SIZE, fog_table);
     glUniform1i(g_gl.render_u_alpha_test_func, g_gl.core.alpha_test_func);
     glUniform1f(g_gl.render_u_alpha_ref, (GLfloat)g_gl.core.alpha_ref);
+    glUniform2f(g_gl.render_u_viewport_origin, (GLfloat)g_gl.viewport_x, (GLfloat)g_gl.viewport_y);
+    glUniform2f(g_gl.render_u_viewport_size, (GLfloat)viewport_width(), (GLfloat)viewport_height());
+}
+
+static void batch_flush(void);
+
+static void fill_batch_vertex(BatchVertex *dst, const GrVertex *src)
+{
+    dst->x = src->x;
+    dst->y = src->y;
+    dst->z = src->z;
+    dst->oow = src->oow;
+    dst->r = src->r;
+    dst->g = src->g;
+    dst->b = src->b;
+    dst->a = src->a;
+    dst->u = src->u;
+    dst->v = src->v;
+}
+
+static void apply_shade_model(BatchVertex *verts, int count)
+{
+    BatchVertex first;
+    int i;
+
+    if (count <= 1 || g_gl.core.shade_model == GR_SHADE_GOURAUD)
+        return;
+
+    first = verts[0];
+    for (i = 1; i < count; ++i) {
+        if ((g_gl.core.shade_model & GR_SHADE_COLOR) != 0) {
+            verts[i].r = first.r;
+            verts[i].g = first.g;
+            verts[i].b = first.b;
+        }
+        if ((g_gl.core.shade_model & GR_SHADE_ALPHA) != 0)
+            verts[i].a = first.a;
+        if ((g_gl.core.shade_model & GR_SHADE_ST) != 0) {
+            verts[i].u = first.u;
+            verts[i].v = first.v;
+        }
+        if ((g_gl.core.shade_model & GR_SHADE_Z) != 0)
+            verts[i].z = first.z;
+        if ((g_gl.core.shade_model & GR_SHADE_W) != 0)
+            verts[i].oow = first.oow;
+    }
+}
+
+static void draw_immediate(GLenum mode, const GrVertex *verts, int count)
+{
+    BatchVertex batch[2];
+    int i;
+
+    if (!g_gl.ready || verts == NULL || count <= 0 || count > 2)
+        return;
+
+    batch_flush();
+    for (i = 0; i < count; ++i)
+        fill_batch_vertex(&batch[i], &verts[i]);
+    apply_shade_model(batch, count);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, g_gl.fbo);
+    glViewport(0, 0, GR_FB_W, GR_FB_H);
+    glEnable(GL_SCISSOR_TEST);
+    set_scissor_rect();
+    apply_depth_state();
+    apply_blend_state();
+
+    glUseProgram(g_gl.render_prog);
+    glBindBuffer(GL_ARRAY_BUFFER, g_gl.batch_vbo);
+    glBufferData(GL_ARRAY_BUFFER,
+                 (GLsizeiptr)(sizeof(batch[0]) * (size_t)count),
+                 batch,
+                 GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, (GLsizei)sizeof(BatchVertex), (const void *)offsetof(BatchVertex, x));
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, (GLsizei)sizeof(BatchVertex), (const void *)offsetof(BatchVertex, r));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, (GLsizei)sizeof(BatchVertex), (const void *)offsetof(BatchVertex, u));
+
+    glActiveTexture(GL_TEXTURE0);
+    if (g_gl.bound_tex >= 0)
+        glBindTexture(GL_TEXTURE_2D, g_gl.textures[g_gl.bound_tex].id);
+    else
+        glBindTexture(GL_TEXTURE_2D, 0);
+    apply_uniforms();
+    glDrawArrays(mode, 0, count);
 }
 
 static void batch_flush(void)
@@ -492,16 +612,7 @@ static void push_triangle(const GrVertex *v0, const GrVertex *v1, const GrVertex
 
     for (i = 0; i < 3; i++) {
         BatchVertex *dst = &g_gl.batch[g_gl.batch_count++];
-        dst->x = src[i]->x;
-        dst->y = src[i]->y;
-        dst->z = src[i]->z;
-        dst->oow = src[i]->oow;
-        dst->r = src[i]->r;
-        dst->g = src[i]->g;
-        dst->b = src[i]->b;
-        dst->a = src[i]->a;
-        dst->u = src[i]->u;
-        dst->v = src[i]->v;
+        fill_batch_vertex(dst, src[i]);
     }
 }
 
@@ -511,11 +622,8 @@ static void push_flat_triangle(const GrVertex *v0, const GrVertex *v1, const GrV
     GrVertex b = *v1;
     GrVertex c = *v2;
 
-    if (g_gl.core.shade_model == GR_SHADE_FLAT) {
-        b.r = a.r; b.g = a.g; b.b = a.b; b.a = a.a;
-        c.r = a.r; c.g = a.g; c.b = a.b; c.a = a.a;
-    }
     push_triangle(&a, &b, &c);
+    apply_shade_model(&g_gl.batch[g_gl.batch_count - 3], 3);
 }
 
 static void blit_to_default(int fb_w, int fb_h)
@@ -594,6 +702,8 @@ int grInit(int win_w, int win_h)
     g_gl.render_u_fog_table = glGetUniformLocation(g_gl.render_prog, "u_fog_table");
     g_gl.render_u_alpha_test_func = glGetUniformLocation(g_gl.render_prog, "u_alpha_test_func");
     g_gl.render_u_alpha_ref = glGetUniformLocation(g_gl.render_prog, "u_alpha_ref");
+    g_gl.render_u_viewport_origin = glGetUniformLocation(g_gl.render_prog, "u_viewport_origin");
+    g_gl.render_u_viewport_size = glGetUniformLocation(g_gl.render_prog, "u_viewport_size");
     g_gl.blit_u_tex = glGetUniformLocation(g_gl.blit_prog, "u_tex");
 
     glGenBuffers(1, &g_gl.batch_vbo);
@@ -657,10 +767,15 @@ void grBufferClear(GrColor_t color, GrAlpha_t alpha, GrDepth_t depth)
     glViewport(0, 0, GR_FB_W, GR_FB_H);
     glEnable(GL_SCISSOR_TEST);
     set_scissor_rect();
-    glDepthMask(GL_TRUE);
     glClearColor(c.r, c.g, c.b, c.a);
     glClearDepthf((GLfloat)depth / 65535.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    if (g_gl.core.depth_mode != GR_DEPTHBUFFER_DISABLE && g_gl.core.depth_mask)
+        glDepthMask(GL_TRUE);
+    glClear(GL_COLOR_BUFFER_BIT |
+            ((g_gl.core.depth_mode != GR_DEPTHBUFFER_DISABLE && g_gl.core.depth_mask)
+                 ? GL_DEPTH_BUFFER_BIT
+                 : 0));
+    glDepthMask(g_gl.core.depth_mask ? GL_TRUE : GL_FALSE);
 }
 
 void grBufferSwap(struct GLFWwindow *window)
@@ -688,8 +803,8 @@ void grViewport(int x, int y, int width, int height)
     batch_flush();
     g_gl.viewport_x = x;
     g_gl.viewport_y = y;
-    g_gl.viewport_w = width;
-    g_gl.viewport_h = height;
+    g_gl.viewport_w = width > 0 ? width : 1;
+    g_gl.viewport_h = height > 0 ? height : 1;
 }
 
 void grClipWindow(int xmin, int ymin, int xmax, int ymax)
@@ -857,9 +972,10 @@ void grTexDownloadMipMap(int tex, const void *data, int w, int h, GrTextureForma
     batch_flush();
     glBindTexture(GL_TEXTURE_2D, slot->id);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
-    glGenerateMipmap(GL_TEXTURE_2D);
     slot->width = w;
     slot->height = h;
+    slot->has_mipmaps = false;
+    ensure_texture_mipmaps(tex);
     apply_texture_params(tex);
     free(rgba);
 }
@@ -881,6 +997,7 @@ void grTexFilter(int tex, GrMipMapMode mm, GrTextureFilter minf, GrTextureFilter
     g_gl.textures[tex].mipmap_mode = mm;
     g_gl.textures[tex].min_filter = minf;
     g_gl.textures[tex].mag_filter = magf;
+    ensure_texture_mipmaps(tex);
     apply_texture_params(tex);
 }
 
@@ -905,43 +1022,21 @@ void grDrawTriangle(const GrVertex *v0, const GrVertex *v1, const GrVertex *v2)
 
 void grDrawPoint(const GrVertex *v)
 {
-    GrVertex a, b, c, d;
     if (!v)
         return;
-    a = *v; b = *v; c = *v; d = *v;
-    a.x -= 0.5f; a.y -= 0.5f;
-    b.x += 0.5f; b.y -= 0.5f;
-    c.x -= 0.5f; c.y += 0.5f;
-    d.x += 0.5f; d.y += 0.5f;
-    push_flat_triangle(&a, &b, &c);
-    push_flat_triangle(&c, &b, &d);
+    draw_immediate(GL_POINTS, v, 1);
 }
 
 void grDrawLine(const GrVertex *v0, const GrVertex *v1)
 {
-    GrVertex a, b, c, d;
-    float dx, dy, len, nx, ny;
+    GrVertex line[2];
 
     if (!v0 || !v1)
         return;
 
-    dx = v1->x - v0->x;
-    dy = v1->y - v0->y;
-    len = (float)sqrt(dx * dx + dy * dy);
-    if (len <= 1e-6f) {
-        grDrawPoint(v0);
-        return;
-    }
-
-    nx = -dy / len * 0.5f;
-    ny = dx / len * 0.5f;
-    a = *v0; b = *v0; c = *v1; d = *v1;
-    a.x += nx; a.y += ny;
-    b.x -= nx; b.y -= ny;
-    c.x += nx; c.y += ny;
-    d.x -= nx; d.y -= ny;
-    push_flat_triangle(&a, &c, &b);
-    push_flat_triangle(&b, &c, &d);
+    line[0] = *v0;
+    line[1] = *v1;
+    draw_immediate(GL_LINES, line, 2);
 }
 
 GrColor_t grColorPack(float r, float g, float b, float a)

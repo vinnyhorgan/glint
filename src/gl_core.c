@@ -60,9 +60,9 @@ void grCoreInitState(GrStateCore *state)
     state->alpha_sf = GR_BLEND_ONE;
     state->alpha_df = GR_BLEND_ZERO;
     state->alpha_test_func = GR_CMP_ALWAYS;
-    state->depth_mode = GR_DEPTHBUFFER_ZBUFFER;
+    state->depth_mode = GR_DEPTHBUFFER_DISABLE;
     state->depth_func = GR_CMP_LESS;
-    state->depth_mask = true;
+    state->depth_mask = false;
     state->shade_model = GR_SHADE_GOURAUD;
     state->constant_color = 0xFFFFFFFFu;
     grCoreSetClipWindow(state, 0, 0, GR_FB_W, GR_FB_H);

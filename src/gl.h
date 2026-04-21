@@ -117,8 +117,13 @@ typedef enum {
 } GrDepthBufferMode_t;
 
 typedef enum {
-    GR_SHADE_FLAT = 0,
-    GR_SHADE_GOURAUD,
+    GR_SHADE_GOURAUD = 0,
+    GR_SHADE_COLOR = 1 << 0,
+    GR_SHADE_ALPHA = 1 << 1,
+    GR_SHADE_ST = 1 << 2,
+    GR_SHADE_Z = 1 << 3,
+    GR_SHADE_W = 1 << 4,
+    GR_SHADE_FLAT = GR_SHADE_COLOR | GR_SHADE_ALPHA | GR_SHADE_ST | GR_SHADE_Z | GR_SHADE_W,
 } GrShadeModel_t;
 
 typedef enum {

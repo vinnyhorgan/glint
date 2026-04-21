@@ -49,6 +49,9 @@ static GrAlphaBlendFnc_t g_last_rgb_sf;
 static GrAlphaBlendFnc_t g_last_rgb_df;
 static GrAlphaBlendFnc_t g_last_alpha_sf;
 static GrAlphaBlendFnc_t g_last_alpha_df;
+static GrDepthBufferMode_t g_last_depth_mode;
+static bool g_last_depth_mask;
+static int g_last_bound_tex;
 static double g_host_time = 12.5;
 static double g_host_dt = 0.25;
 static char g_last_title[128];
@@ -92,6 +95,12 @@ static int test_host_key_down(void *userdata, int key)
 {
     (void)userdata;
     return key == 263 || key == 'A';
+}
+
+static int test_host_key_pressed(void *userdata, int key)
+{
+    (void)userdata;
+    return key == 32;
 }
 
 static int test_host_mouse_down(void *userdata, int button)
@@ -199,9 +208,9 @@ void grAlphaBlendFunction(GrAlphaBlendFnc_t rgb_sf,
 void grAlphaTestFunction(GrCmpFnc_t func) { (void)func; }
 void grAlphaTestReferenceValue(GrAlpha_t value) { (void)value; }
 void grConstantColorValue(GrColor_t color) { (void)color; }
-void grDepthBufferMode(GrDepthBufferMode_t mode) { (void)mode; }
+void grDepthBufferMode(GrDepthBufferMode_t mode) { g_last_depth_mode = mode; }
 void grDepthBufferFunction(GrCmpFnc_t func) { (void)func; }
-void grDepthMask(bool enabled) { (void)enabled; }
+void grDepthMask(bool enabled) { g_last_depth_mask = enabled; }
 void grCullMode(GrCullMode_t mode) { (void)mode; }
 void grShadeModel(GrShadeModel_t mode) { (void)mode; }
 void grFogMode(GrFogMode_t mode) { (void)mode; }
@@ -227,7 +236,7 @@ void grTexDownloadMipMap(int tex, const void *data, int w, int h, GrTextureForma
     memcpy(g_tex_upload.pixels, data, (size_t)total_bytes);
 }
 
-void grTexBind(int tex) { (void)tex; }
+void grTexBind(int tex) { g_last_bound_tex = tex; }
 
 void grTexFilter(int tex, GrMipMapMode mm, GrTextureFilter minf, GrTextureFilter magf)
 {
@@ -298,6 +307,7 @@ int run_gl_bindings_tests(void)
     host.time_now = test_host_time_now;
     host.delta_time = test_host_delta_time;
     host.key_down = test_host_key_down;
+    host.key_pressed = test_host_key_pressed;
     host.mouse_down = test_host_mouse_down;
     host.mouse_position = test_host_mouse_position;
     host.framebuffer_size = test_host_framebuffer_size;
@@ -321,8 +331,11 @@ int run_gl_bindings_tests(void)
             "assert glide.dt() == 0.25\n"
             "assert glide.key_down('left')\n"
             "assert glide.key_down('a')\n"
+            "assert glide.key_pressed('space')\n"
             "assert glide.mouse_down('right')\n"
             "assert glide.mouse_position() == (123.0, 45.0)\n"
+            "assert glide.mouse_x() == 123.0\n"
+            "assert glide.mouse_y() == 45.0\n"
             "assert glide.screen_size() == (960, 720)\n"
             "assert glide.color_tuple(packed)[0] == 1.0\n"
             "v0 = glide.vertex(10.0, 20.0, 0.25, 0.5, packed, 0.75, 0.125)\n"
@@ -335,9 +348,23 @@ int run_gl_bindings_tests(void)
             "fog = glide.make_fog_table(2.0, 10.0)\n"
             "assert len(fog) == glide.FOG_TABLE_SIZE\n"
             "assert fog[0] == 0\n"
+            "glide.triangle((1.0, 2.0), (3.0, 4.0, 0.25, 0.5), (5.0, 6.0, 128, 64, 32))\n"
+            "glide.triangle((7.0, 8.0, 255, 128, 0, 0.25, 0.75), (9.0, 10.0, 0.5, 255, 255, 255, 1.0, 0.0), v0)\n"
             "tex = glide.upload_texture(2, 1, [128, 1, 2, 3, 255, 4, 5, 6])\n"
             "assert tex == 1\n"
             "glide.image(tex, 100.0, 120.0, 16.0, 12.0, (0.8, 0.7, 0.6, 0.5))\n"
+            "glide.set_mode('flat')\n"
+            "glide.set_mode('gouraud')\n"
+            "glide.set_mode('textured')\n"
+            "glide.set_mode('textured_gouraud')\n"
+            "glide.set_mode('transparent')\n"
+            "glide.begin_2d()\n"
+            "glide.begin_3d()\n"
+            "try:\n"
+            "    glide.tex_download_mipmap(1, 1, 1, 999, [0, 0, 0, 0])\n"
+            "    raise AssertionError('expected invalid texture format failure')\n"
+            "except ValueError:\n"
+            "    pass\n"
             "glide.clear((0.25, 0.5, 0.75, 0.5), 0x1234)\n"
             "glide.set_title('binding test')\n"
             "glide.quit()\n"
@@ -351,7 +378,7 @@ int run_gl_bindings_tests(void)
         g_failures++;
     }
 
-    CHECK(g_triangle_count == 5);
+    CHECK(g_triangle_count == 7);
     CHECK(g_point_count == 1);
     CHECK(g_line_count == 1);
     CHECK(nearf(g_first_triangle[0].x, 10.0f));
@@ -364,6 +391,9 @@ int run_gl_bindings_tests(void)
     CHECK(nearf(g_first_triangle[2].g, 0.3f));
     CHECK(nearf(g_first_triangle[2].b, 0.4f));
     CHECK(nearf(g_first_triangle[2].a, 1.0f));
+    CHECK(nearf(g_last_triangle[0].x, 100.0f));
+    CHECK(nearf(g_last_triangle[0].u, 0.0f));
+    CHECK(nearf(g_last_triangle[0].a, 0.5f));
 
     CHECK(g_tex_upload.tex == 1);
     CHECK(g_tex_upload.width == 2);
@@ -379,6 +409,7 @@ int run_gl_bindings_tests(void)
     CHECK(g_last_tex_clamp_tex == 1);
     CHECK(g_last_tex_clamp_s == GR_TEXTURECLAMP_WRAP);
     CHECK(g_last_tex_clamp_t == GR_TEXTURECLAMP_WRAP);
+    CHECK(g_last_bound_tex == -1);
     CHECK(strcmp(g_last_title, "binding test") == 0);
     CHECK(g_quit_requested == 1);
 
@@ -396,6 +427,8 @@ int run_gl_bindings_tests(void)
     CHECK(g_last_alpha_local == GR_COMBINE_LOCAL_ITERATED);
     CHECK(g_last_alpha_other == GR_COMBINE_OTHER_TEXTURE);
     CHECK(!g_last_alpha_invert);
+    CHECK(g_last_depth_mode == GR_DEPTHBUFFER_ZBUFFER);
+    CHECK(g_last_depth_mask);
 
     CHECK(g_last_rgb_sf == GR_BLEND_SRC_ALPHA);
     CHECK(g_last_rgb_df == GR_BLEND_ONE);

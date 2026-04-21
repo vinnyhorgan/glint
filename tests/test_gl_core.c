@@ -30,9 +30,9 @@ static void test_defaults(void)
     CHECK(state.rgb_sf == GR_BLEND_ONE);
     CHECK(state.rgb_df == GR_BLEND_ZERO);
     CHECK(state.alpha_test_func == GR_CMP_ALWAYS);
-    CHECK(state.depth_mode == GR_DEPTHBUFFER_ZBUFFER);
+    CHECK(state.depth_mode == GR_DEPTHBUFFER_DISABLE);
     CHECK(state.depth_func == GR_CMP_LESS);
-    CHECK(state.depth_mask);
+    CHECK(!state.depth_mask);
     CHECK(state.clip_xmin == 0 && state.clip_ymin == 0);
     CHECK(state.clip_xmax == GR_FB_W && state.clip_ymax == GR_FB_H);
 }
