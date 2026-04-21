@@ -26,6 +26,8 @@ The fantasy hardware profile:
 
 Exposes a **useful subset of Glide 2.2** via Python bindings. The API is designed to feel like programming a Voodoo 1, but with Pythonic ergonomics.
 
+> The full Glide 2.2 Reference Manual (`glideref.htm`) is included in this repository as the canonical source for the underlying API semantics. The glint subset strips away vendor-specific hardware management, framebuffer access, anti-aliasing, and other low-level details that are irrelevant to a fantasy console, while preserving the core rasterization vocabulary: `grColorCombine`, `grAlphaBlendFunction`, `grDrawTriangle`, `grTexSource`, etc.
+
 - **No hardware T&L.** You write vertex transforms in Python.
 - **No hardware lighting.** You compute vertex colors in Python and pass them to the rasterizer.
 - **Immediate-mode triangles.** The hardware only understands `draw_triangle(v1, v2, v3)`.
@@ -282,6 +284,12 @@ ninja clean    # remove build artifacts
 3. **Matrix math:** Expose a `glint.math` module with basic 3D math, or force users to write their own?
 4. **Font rendering:** Bitmap font API, or users draw text with triangles?
 5. **Asset pipeline:** How do users convert PNGs/textures into `.glint` format? Separate tool?
+
+---
+
+## Appendix A: Reference Material
+
+- **Glide 2.2 Reference Manual** (`glideref.htm`) — Complete API documentation for the original 3dfx Voodoo Graphics library. This is the source material from which the glint rendering subset is derived.
 
 ---
 

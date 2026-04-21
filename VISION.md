@@ -41,3 +41,7 @@ The name itself should carry a little shine, a little flicker, and a little nost
 ## In One Sentence
 
 glint is a tiny retro-future fantasy PC for making evocative 3D worlds with the fewest moving parts possible.
+
+## Reference
+
+For the full technical specification, see `SPEC.md`. The original **Glide 2.2 Reference Manual** (`glideref.htm`) is included in this repository as the canonical source for the rendering API subset.
