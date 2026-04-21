@@ -111,17 +111,20 @@ static const char s_vbatch[] =
     "attribute vec2 a_uv;\n"
     "varying vec4 v_col;\n"
     "varying vec2 v_uv;\n"
+    "varying float v_fog_z;\n"
     "void main(){\n"
     "  float w=1.0/a_pos.w;\n"
     "  gl_Position=vec4(a_pos.x,a_pos.y,a_pos.z,w);\n"
     "  v_col=a_col;\n"
     "  v_uv=a_uv;\n"
+    "  v_fog_z=w;\n"
     "}\n";
 
 static const char s_fbatch[] =
     "precision mediump float;\n"
     "varying vec4 v_col;\n"
     "varying vec2 v_uv;\n"
+    "varying float v_fog_z;\n"
     "uniform sampler2D u_tex;\n"
     "uniform int u_col_combine;\n"
     "uniform int u_alpha_combine;\n"
@@ -151,8 +154,11 @@ static const char s_fbatch[] =
     "    if(!pass) discard;\n"
     "  }\n"
     "  if(u_fog_mode!=0){\n"
-    "    float z=gl_FragCoord.z;\n"
-    "    float fog=clamp((u_fog_end-z)/(u_fog_end-u_fog_start),0.0,1.0);\n"
+    "    float z=max(v_fog_z,0.0001);\n"
+    "    float fog;\n"
+    "    if(u_fog_mode==1) fog=clamp((u_fog_end-z)/(u_fog_end-u_fog_start),0.0,1.0);\n"
+    "    else if(u_fog_mode==2) fog=exp(-u_fog_start*z);\n"
+    "    else fog=exp(-(u_fog_start*z)*(u_fog_start*z));\n"
     "    c.rgb=mix(u_fog_col.rgb,c.rgb,fog);\n"
     "  }\n"
     "  gl_FragColor=c;\n"
@@ -171,7 +177,7 @@ static const char s_fblit[] =
     "varying vec2 v_uv;\n"
     "uniform sampler2D u_tex;\n"
     "void main(){\n"
-    "  gl_FragColor=texture2D(u_tex,v_uv);\n"
+    "  gl_FragColor=vec4(texture2D(u_tex,v_uv).rgb,1.0);\n"
     "}\n";
 
 /* -------------------------------------------------------------------------- */
@@ -601,9 +607,26 @@ void grFogColorValue(GrColor_t colour)
 
 void grFogTable(const float *table, int n)
 {
-    (void)table;
-    (void)n;
-    /* Simplified: linear fog only; table ignored for now. */
+    if (!table || n <= 0) return;
+
+    if (n == 1) {
+        grFogRange(0.0f, table[0]);
+        return;
+    }
+
+    grFogRange(table[0], table[n - 1]);
+}
+
+void grFogRange(float start, float end)
+{
+    if (start < 0.0f) start = 0.0f;
+    if (end <= start) end = start + 0.001f;
+
+    if (g.state.fog_start != start || g.state.fog_end != end) {
+        state_change();
+        g.state.fog_start = start;
+        g.state.fog_end = end;
+    }
 }
 
 void grCullMode(GrCullMode mode)

@@ -104,6 +104,7 @@ void grAlphaCombine(GrCombineMode mode);
 void grFogMode(GrFogMode mode);
 void grFogColorValue(GrColor_t colour);
 void grFogTable(const float *table, int n);
+void grFogRange(float start, float end);
 void grCullMode(GrCullMode mode);
 
 /* -------------------------------------------------------------------------- */
