@@ -64,6 +64,33 @@ def glow(cx, cy, radius, color, layers=4):
         circle(cx, cy, r, (color[0], color[1], color[2], a), 28)
 
 
+def diamond(cx, cy, radius, color, inner=None):
+    poly([
+        (cx, cy - radius),
+        (cx + radius * 0.9, cy),
+        (cx, cy + radius),
+        (cx - radius * 0.9, cy),
+    ], color)
+    if inner is not None:
+        poly([
+            (cx, cy - radius * 0.45),
+            (cx + radius * 0.42, cy),
+            (cx, cy + radius * 0.45),
+            (cx - radius * 0.42, cy),
+        ], inner)
+
+
+def chevron(cx, cy, w, h, color):
+    poly([
+        (cx - w, cy - h),
+        (cx, cy + h),
+        (cx + w, cy - h),
+        (cx + w * 0.5, cy - h),
+        (cx, cy + h * 0.3),
+        (cx - w * 0.5, cy - h),
+    ], color)
+
+
 def star(x, y, s, color):
     g.rect(x, y, s, 1.0, color)
     g.rect(x, y, 1.0, s, color)
@@ -80,7 +107,10 @@ def mountain(x, base_y, width, height, color):
 def sun(cx, cy, radius):
     g.set_blend_add()
     glow(cx, cy, radius * 1.3, rgba255(255, 80, 180, 220), 5)
+    glow(cx, cy, radius * 0.78, rgba255(255, 210, 120, 110), 3)
     g.set_blend_none()
+
+    circle(cx, cy, radius * 1.02, rgba255(70, 30, 90, 180), 30)
 
     for band in range(10):
         t = band / 9.0
@@ -93,6 +123,10 @@ def sun(cx, cy, radius):
             1.0,
         )
         g.rect(cx - radius + inset, band_y, radius * 2.0 - inset * 2.0, radius * 0.18, color)
+
+    g.set_blend_add()
+    g.rect(cx - radius * 1.1, cy + radius * 0.25, radius * 2.2, 2.0, rgba255(255, 90, 210, 90))
+    g.set_blend_none()
 
 
 def skyline(t):
@@ -139,13 +173,32 @@ def orbiters(t):
         x = target_x + math.cos(a) * (28.0 + i * 16.0)
         y = target_y + math.sin(a * 1.7) * (10.0 + i * 5.0)
         r = 7.0 + i * 2.0 + math.sin(t * 3.0 + i) * 1.5
+        ship = rgba255(120 + i * 45, 240 - i * 35, 255, 225)
+        core = rgba255(255, 255, 255, 255)
+        trail = rgba255(255, 120 + i * 30, 220, 70)
 
         g.set_blend_add()
-        glow(x, y, r * 1.8, rgba255(120 + i * 50, 240 - i * 40, 255, 180), 4)
+        glow(x, y, r * 1.9, ship, 4)
+        chevron(x, y + r * 1.35, r * 0.55, r * 0.7, trail)
         g.set_blend_none()
-        circle(x, y, r, rgba255(255, 255, 255, 220), 18)
+        diamond(x, y, r, ship, core)
+        circle(x, y, r * 0.28, core, 12)
         g.line(g.vertex(target_x, target_y, color=rgba255(255, 255, 255, 80)),
                g.vertex(x, y, color=rgba255(255, 255, 255, 20)))
+
+
+def satellites(t):
+    for i in range(2):
+        a = t * (0.35 + i * 0.12) + i * 2.7
+        x = 160.0 + math.cos(a) * (92.0 + i * 18.0)
+        y = 64.0 + math.sin(a * 1.6) * (22.0 + i * 8.0)
+        s = 5.0 + i * 1.5
+        g.set_blend_add()
+        glow(x, y, s * 2.3, rgba255(120, 210, 255, 90), 3)
+        g.set_blend_none()
+        diamond(x, y, s, rgba255(40, 70, 100, 255), rgba255(200, 245, 255, 255))
+        g.line(g.vertex(x - s * 1.6, y, color=rgba255(255, 255, 255, 140)),
+               g.vertex(x + s * 1.6, y, color=rgba255(255, 255, 255, 60)))
 
 
 def draw_stars(t):
@@ -155,6 +208,19 @@ def draw_stars(t):
         twinkle = 0.4 + 0.6 * (0.5 + 0.5 * math.sin(t * 3.0 + i * 2.7))
         color = (twinkle, twinkle, twinkle * 1.2, 1.0)
         star(x, y, 2.0 if (i % 3) == 0 else 1.0, color)
+
+
+def foreground_shards(t):
+    for i in range(5):
+        base_x = 36.0 + i * 58.0 + math.sin(t * 0.8 + i) * 4.0
+        base_y = 196.0 + (i % 2) * 8.0
+        glow_amt = 0.5 + 0.5 * math.sin(t * 2.5 + i * 0.7)
+        c = (0.3 + glow_amt * 0.5, 0.9, 1.0, 0.85)
+        g.triangle(
+            g.vertex(base_x, base_y, color=c),
+            g.vertex(base_x + 12.0, base_y - 36.0, color=(0.1, 0.4, 0.8, 0.2)),
+            g.vertex(base_x + 28.0, base_y, color=c),
+        )
 
 
 def controls(dt):
@@ -198,6 +264,7 @@ def draw():
     draw_stars(t)
 
     sun(160.0 + math.sin(t * 0.35) * 10.0, 74.0, 46.0 + math.sin(t * 1.2) * 2.0)
+    satellites(t)
 
     mountain(-30.0, horizon + 12.0, 150.0, 66.0, rgba255(22, 16, 46))
     mountain(48.0, horizon + 12.0, 134.0, 58.0, rgba255(32, 18, 62))
@@ -209,18 +276,8 @@ def draw():
 
     g.set_blend_add()
     g.rect(0.0, horizon - 1.0, 320.0, 3.0, rgba255(255, 70, 220, 120))
+    g.rect(0.0, horizon + 2.0, 320.0, 1.0, rgba255(40, 235, 255, 60))
     g.set_blend_none()
 
     orbiters(t + state["pulse"] * 0.2)
-
-    # Foreground shards.
-    for i in range(5):
-        base_x = 36.0 + i * 58.0 + math.sin(t * 0.8 + i) * 4.0
-        base_y = 196.0 + (i % 2) * 8.0
-        glow = 0.5 + 0.5 * math.sin(t * 2.5 + i * 0.7)
-        c = (0.3 + glow * 0.5, 0.9, 1.0, 0.85)
-        g.triangle(
-            g.vertex(base_x, base_y, color=c),
-            g.vertex(base_x + 12.0, base_y - 36.0, color=(0.1, 0.4, 0.8, 0.2)),
-            g.vertex(base_x + 28.0, base_y, color=c),
-        )
+    foreground_shards(t)

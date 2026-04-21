@@ -19,6 +19,23 @@ typedef struct {
     double delta_time;
 } RuntimeHost;
 
+static int g_needs_resize_repaint;
+
+static void present_black(GLFWwindow *window)
+{
+    int fb_w = 0;
+    int fb_h = 0;
+    glfwGetFramebufferSize(window, &fb_w, &fb_h);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, fb_w, fb_h);
+    glDisable(GL_SCISSOR_TEST);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glfwSwapBuffers(window);
+}
+
 static void error_cb(int code, const char *desc)
 {
     fprintf(stderr, "GLFW error %d: %s\n", code, desc);
@@ -114,6 +131,20 @@ static void key_cb(GLFWwindow *window, int key, int scancode, int action, int mo
     (void)mods;
     if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE)
         glfwSetWindowShouldClose(window, 1);
+}
+
+static void framebuffer_size_cb(GLFWwindow *window, int width, int height)
+{
+    (void)window;
+    (void)width;
+    (void)height;
+    g_needs_resize_repaint = 1;
+}
+
+static void window_refresh_cb(GLFWwindow *window)
+{
+    (void)window;
+    g_needs_resize_repaint = 1;
 }
 
 static char *read_text_file(const char *path)
@@ -215,6 +246,7 @@ int main(int argc, char **argv)
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+    glfwWindowHint(GLFW_ALPHA_BITS, 0);
     glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_FALSE);
 
     window = glfwCreateWindow(960, 720, "glint", NULL, NULL);
@@ -224,7 +256,10 @@ int main(int argc, char **argv)
     }
 
     glfwMakeContextCurrent(window);
+    glfwSetWindowOpacity(window, 1.0f);
     glfwSetKeyCallback(window, key_cb);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_cb);
+    glfwSetWindowRefreshCallback(window, window_refresh_cb);
     glfwSwapInterval(1);
 
     if (!gladLoadGLES2(glad_loader)) {
@@ -289,6 +324,10 @@ int main(int argc, char **argv)
         double now;
 
         glfwPollEvents();
+        if (g_needs_resize_repaint) {
+            present_black(window);
+            g_needs_resize_repaint = 0;
+        }
         now = glfwGetTime();
         host.delta_time = now - last_time;
         if (host.delta_time > 0.1)
