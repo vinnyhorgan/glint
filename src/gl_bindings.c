@@ -102,6 +102,7 @@ static const char *kBindingsBootstrap[] = {
     "    q2 = vertex(x + w, y + h, z, 1.0, color, u1, v1)\n"
     "    q3 = vertex(x, y + h, z, 1.0, color, u0, v1)\n"
     "    quad(q0, q1, q2, q3)\n"
+    "    set_untextured()\n"
     "\n"
     "def upload_texture(width, height, pixels, fmt=None, mipmap=None, min_filter=None, mag_filter=None, s_clamp=None, t_clamp=None):\n"
     "    if fmt is None:\n"
@@ -137,6 +138,7 @@ static const char *kBindingsBootstrap[] = {
     "    return out\n"
     "\n"
     "def set_untextured():\n"
+    "    tex_bind(-1)\n"
     "    color_combine(COMBINE_FUNCTION_LOCAL, COMBINE_FACTOR_NONE, COMBINE_LOCAL_ITERATED, COMBINE_OTHER_NONE, False)\n"
     "    alpha_combine(COMBINE_FUNCTION_LOCAL, COMBINE_FACTOR_NONE, COMBINE_LOCAL_ITERATED, COMBINE_OTHER_NONE, False)\n"
     "\n"
@@ -236,6 +238,8 @@ static bool cast_float_ref(py_Ref value, float *out)
 static bool cast_int_ref(py_Ref value, int *out)
 {
     py_i64 i = 0;
+    if (!py_isint(value) && !py_isbool(value))
+        return false;
     if (!py_castint(value, &i))
         return false;
     *out = (int)i;

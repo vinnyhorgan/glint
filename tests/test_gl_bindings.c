@@ -19,6 +19,7 @@ static int g_failures;
 static GrColor_t g_last_clear_color;
 static GrAlpha_t g_last_clear_alpha;
 static GrDepth_t g_last_clear_depth;
+static GrVertex g_first_triangle[3];
 static GrVertex g_last_triangle[3];
 static int g_triangle_count;
 static GrVertex g_last_point;
@@ -245,6 +246,11 @@ void grTexClampMode(int tex, GrTextureClampMode s_clamp, GrTextureClampMode t_cl
 
 void grDrawTriangle(const GrVertex *v0, const GrVertex *v1, const GrVertex *v2)
 {
+    if (g_triangle_count == 0) {
+        g_first_triangle[0] = *v0;
+        g_first_triangle[1] = *v1;
+        g_first_triangle[2] = *v2;
+    }
     g_last_triangle[0] = *v0;
     g_last_triangle[1] = *v1;
     g_last_triangle[2] = *v2;
@@ -348,16 +354,16 @@ int run_gl_bindings_tests(void)
     CHECK(g_triangle_count == 5);
     CHECK(g_point_count == 1);
     CHECK(g_line_count == 1);
-    CHECK(nearf(g_last_triangle[0].x, 10.0f));
-    CHECK(nearf(g_last_triangle[0].y, 20.0f));
-    CHECK(nearf(g_last_triangle[0].z, 0.25f));
-    CHECK(nearf(g_last_triangle[0].oow, 0.5f));
-    CHECK(nearf(g_last_triangle[0].u, 0.75f));
-    CHECK(nearf(g_last_triangle[0].v, 0.125f));
-    CHECK(nearf(g_last_triangle[2].r, 0.2f));
-    CHECK(nearf(g_last_triangle[2].g, 0.3f));
-    CHECK(nearf(g_last_triangle[2].b, 0.4f));
-    CHECK(nearf(g_last_triangle[2].a, 1.0f));
+    CHECK(nearf(g_first_triangle[0].x, 10.0f));
+    CHECK(nearf(g_first_triangle[0].y, 20.0f));
+    CHECK(nearf(g_first_triangle[0].z, 0.25f));
+    CHECK(nearf(g_first_triangle[0].oow, 0.5f));
+    CHECK(nearf(g_first_triangle[0].u, 0.75f));
+    CHECK(nearf(g_first_triangle[0].v, 0.125f));
+    CHECK(nearf(g_first_triangle[2].r, 0.2f));
+    CHECK(nearf(g_first_triangle[2].g, 0.3f));
+    CHECK(nearf(g_first_triangle[2].b, 0.4f));
+    CHECK(nearf(g_first_triangle[2].a, 1.0f));
 
     CHECK(g_tex_upload.tex == 1);
     CHECK(g_tex_upload.width == 2);

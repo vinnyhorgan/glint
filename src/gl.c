@@ -249,7 +249,8 @@ static const char *kBlitFs[] = {
     "varying vec2 v_uv;\n"
     "uniform sampler2D u_tex;\n"
     "void main() {\n"
-    "  gl_FragColor = texture2D(u_tex, v_uv);\n",
+    "  vec4 c = texture2D(u_tex, v_uv);\n"
+    "  gl_FragColor = vec4(c.rgb, 1.0);\n",
     "}\n",
 };
 
@@ -529,18 +530,20 @@ static void blit_to_default(int fb_w, int fb_h)
     t = 1.0f - ((float)y / (float)fb_h) * 2.0f;
     b = 1.0f - ((float)(y + h) / (float)fb_h) * 2.0f;
 
-    verts[0] = l; verts[1] = t; verts[2] = 0.0f; verts[3] = 0.0f;
-    verts[4] = r; verts[5] = t; verts[6] = 1.0f; verts[7] = 0.0f;
-    verts[8] = l; verts[9] = b; verts[10] = 0.0f; verts[11] = 1.0f;
-    verts[12] = l; verts[13] = b; verts[14] = 0.0f; verts[15] = 1.0f;
-    verts[16] = r; verts[17] = t; verts[18] = 1.0f; verts[19] = 0.0f;
-    verts[20] = r; verts[21] = b; verts[22] = 1.0f; verts[23] = 1.0f;
+    verts[0] = l; verts[1] = t; verts[2] = 0.0f; verts[3] = 1.0f;
+    verts[4] = r; verts[5] = t; verts[6] = 1.0f; verts[7] = 1.0f;
+    verts[8] = l; verts[9] = b; verts[10] = 0.0f; verts[11] = 0.0f;
+    verts[12] = l; verts[13] = b; verts[14] = 0.0f; verts[15] = 0.0f;
+    verts[16] = r; verts[17] = t; verts[18] = 1.0f; verts[19] = 1.0f;
+    verts[20] = r; verts[21] = b; verts[22] = 1.0f; verts[23] = 0.0f;
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, fb_w, fb_h);
     glDisable(GL_SCISSOR_TEST);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(g_gl.blit_prog);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, g_gl.color_tex);

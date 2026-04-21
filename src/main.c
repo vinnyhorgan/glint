@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 
 #include "gl.h"
+#include "gl_core.h"
 #include "gl_bindings.h"
 
 #include <stdio.h>
@@ -55,9 +56,36 @@ static int host_mouse_down(void *userdata, int button)
 static void host_mouse_position(void *userdata, float *x, float *y)
 {
     RuntimeHost *host = (RuntimeHost *)userdata;
+    int win_w = 0;
+    int win_h = 0;
+    int view_x = 0;
+    int view_y = 0;
+    int view_w = 0;
+    int view_h = 0;
     double mx = 0.0;
     double my = 0.0;
+
+    glfwGetWindowSize(host->window, &win_w, &win_h);
     glfwGetCursorPos(host->window, &mx, &my);
+
+    grCoreComputeBlitRect(win_w, win_h, &view_x, &view_y, &view_w, &view_h);
+    if (view_w <= 0 || view_h <= 0) {
+        *x = 0.0f;
+        *y = 0.0f;
+        return;
+    }
+
+    mx = (mx - (double)view_x) * (double)GR_FB_W / (double)view_w;
+    my = (my - (double)view_y) * (double)GR_FB_H / (double)view_h;
+    if (mx < 0.0)
+        mx = 0.0;
+    if (my < 0.0)
+        my = 0.0;
+    if (mx > (double)(GR_FB_W - 1))
+        mx = (double)(GR_FB_W - 1);
+    if (my > (double)(GR_FB_H - 1))
+        my = (double)(GR_FB_H - 1);
+
     *x = (float)mx;
     *y = (float)my;
 }
@@ -187,6 +215,7 @@ int main(int argc, char **argv)
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+    glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_FALSE);
 
     window = glfwCreateWindow(960, 720, "glint", NULL, NULL);
     if (window == NULL) {

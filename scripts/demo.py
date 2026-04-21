@@ -8,7 +8,6 @@ state = {
     "speed": 1.0,
     "tilt": 0.0,
     "pulse": 0.0,
-    "glow": 0,
     "grid_phase": 0.0,
     "title_timer": 0.0,
 }
@@ -30,21 +29,13 @@ def rgba255(r, g, b, a=255):
     return (r / 255.0, g / 255.0, b / 255.0, a / 255.0)
 
 
-def make_glow_texture(size):
-    pixels = []
-    radius = size * 0.5
-    for y in range(size):
-        for x in range(size):
-            dx = (x + 0.5) - radius
-            dy = (y + 0.5) - radius
-            d = math.sqrt(dx * dx + dy * dy) / radius
-            a = clamp(1.0 - d, 0.0, 1.0)
-            a = a * a
-            pixels.append(int(a * 255.0 + 0.5))
-            pixels.append(255)
-            pixels.append(255)
-            pixels.append(255)
-    return pixels
+def format_speed(value):
+    scaled = int(value * 100.0 + 0.5)
+    whole = scaled // 100
+    frac = scaled % 100
+    if frac < 10:
+        return str(whole) + ".0" + str(frac)
+    return str(whole) + "." + str(frac)
 
 
 def poly(points, color):
@@ -65,6 +56,14 @@ def circle(cx, cy, radius, color, steps=24):
     poly(points, color)
 
 
+def glow(cx, cy, radius, color, layers=4):
+    for i in range(layers, 0, -1):
+        t = i / layers
+        r = radius * (0.45 + t * 0.75)
+        a = color[3] * (0.08 + t * 0.18)
+        circle(cx, cy, r, (color[0], color[1], color[2], a), 28)
+
+
 def star(x, y, s, color):
     g.rect(x, y, s, 1.0, color)
     g.rect(x, y, 1.0, s, color)
@@ -80,8 +79,7 @@ def mountain(x, base_y, width, height, color):
 
 def sun(cx, cy, radius):
     g.set_blend_add()
-    g.image(state["glow"], cx - radius * 1.6, cy - radius * 1.6, radius * 3.2, radius * 3.2,
-            rgba255(255, 80, 180, 180))
+    glow(cx, cy, radius * 1.3, rgba255(255, 80, 180, 220), 5)
     g.set_blend_none()
 
     for band in range(10):
@@ -133,8 +131,8 @@ def grid(t):
 
 def orbiters(t):
     mx, my = g.mouse_position()
-    target_x = clamp(mx / 3.0, 40.0, 280.0)
-    target_y = clamp(my / 3.0, 40.0, 200.0)
+    target_x = clamp(mx, 40.0, 280.0)
+    target_y = clamp(my, 40.0, 200.0)
 
     for i in range(3):
         a = t * (0.8 + i * 0.25) + i * 2.1
@@ -143,8 +141,7 @@ def orbiters(t):
         r = 7.0 + i * 2.0 + math.sin(t * 3.0 + i) * 1.5
 
         g.set_blend_add()
-        g.image(state["glow"], x - r * 2.2, y - r * 2.2, r * 4.4, r * 4.4,
-                rgba255(120 + i * 50, 240 - i * 40, 255, 140))
+        glow(x, y, r * 1.8, rgba255(120 + i * 50, 240 - i * 40, 255, 180), 4)
         g.set_blend_none()
         circle(x, y, r, rgba255(255, 255, 255, 220), 18)
         g.line(g.vertex(target_x, target_y, color=rgba255(255, 255, 255, 80)),
@@ -177,7 +174,6 @@ def controls(dt):
 
 
 def load():
-    state["glow"] = g.upload_texture(48, 48, make_glow_texture(48), min_filter=g.TEXTUREFILTER_BILINEAR)
     g.set_title("glint | python runtime demo")
 
 
@@ -190,7 +186,7 @@ def update(dt):
     state["title_timer"] += dt
     if state["title_timer"] > 0.2:
         state["title_timer"] = 0.0
-        g.set_title("glint | python runtime demo | speed %.2f" % state["speed"])
+        g.set_title("glint | python runtime demo | speed " + format_speed(state["speed"]))
 
 
 def draw():
