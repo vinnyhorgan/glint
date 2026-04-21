@@ -214,10 +214,9 @@ static void key_cb(GLFWwindow *window, int key, int scancode, int action, int mo
 {
     (void)scancode;
     (void)mods;
+    (void)window;
     if (g_runtime_host != NULL && action == GLFW_PRESS && key >= 0 && key <= GLFW_KEY_LAST)
         g_runtime_host->pressed_keys[key] = 1;
-    if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE)
-        glfwSetWindowShouldClose(window, 1);
     if (action == GLFW_PRESS && g_script_hooks.has_keydown)
         dispatch_key_event(&g_script_hooks.keydown_func, "keydown(key)", key);
     if (action == GLFW_RELEASE && g_script_hooks.has_keyup)

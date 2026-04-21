@@ -334,8 +334,10 @@ int run_gl_bindings_tests(void)
             "assert glide.key_pressed('space')\n"
             "assert glide.mouse_down('right')\n"
             "assert glide.mouse_position() == (123.0, 45.0)\n"
-            "assert glide.mouse_x() == 123.0\n"
-            "assert glide.mouse_y() == 45.0\n"
+"assert glide.mouse_x() == 123\n"
+"assert glide.mouse_y() == 45\n"
+"assert isinstance(glide.mouse_x(), int)\n"
+"assert isinstance(glide.mouse_y(), int)\n"
             "assert glide.screen_size() == (960, 720)\n"
             "assert glide.color_tuple(packed)[0] == 1.0\n"
             "v0 = glide.vertex(10.0, 20.0, 0.25, 0.5, packed, 0.75, 0.125)\n"
@@ -352,7 +354,8 @@ int run_gl_bindings_tests(void)
             "glide.triangle((7.0, 8.0, 255, 128, 0, 0.25, 0.75), (9.0, 10.0, 0.5, 255, 255, 255, 1.0, 0.0), v0)\n"
             "tex = glide.upload_texture(2, 1, [128, 1, 2, 3, 255, 4, 5, 6])\n"
             "assert tex == 1\n"
-            "glide.image(tex, 100.0, 120.0, 16.0, 12.0, (0.8, 0.7, 0.6, 0.5))\n"
+            "glide.set_textured_modulate()\n"
+"glide.image(tex, 100.0, 120.0, 16.0, 12.0, (0.8, 0.7, 0.6, 0.5))\n"
             "glide.set_mode('flat')\n"
             "glide.set_mode('gouraud')\n"
             "glide.set_mode('textured')\n"
@@ -372,7 +375,8 @@ int run_gl_bindings_tests(void)
             "glide.set_textured_modulate()\n"
             "glide.set_blend_none()\n"
             "glide.set_blend_alpha()\n"
-            "glide.set_blend_add()\n",
+            "glide.set_blend_add()\n"
+"glide.buffer_swap()\n",
             "<bindings-test>", EXEC_MODE, main_mod)) {
         py_printexc();
         g_failures++;
@@ -434,6 +438,101 @@ int run_gl_bindings_tests(void)
     CHECK(g_last_rgb_df == GR_BLEND_ONE);
     CHECK(g_last_alpha_sf == GR_BLEND_ONE);
     CHECK(g_last_alpha_df == GR_BLEND_ONE);
+
+    memset(&g_last_color_func, 0, sizeof(g_last_color_func));
+    memset(&g_last_color_factor, 0, sizeof(g_last_color_factor));
+    memset(&g_last_color_local, 0, sizeof(g_last_color_local));
+    memset(&g_last_color_other, 0, sizeof(g_last_color_other));
+    memset(&g_last_alpha_func, 0, sizeof(g_last_alpha_func));
+    memset(&g_last_alpha_factor, 0, sizeof(g_last_alpha_factor));
+    memset(&g_last_alpha_local, 0, sizeof(g_last_alpha_local));
+    memset(&g_last_alpha_other, 0, sizeof(g_last_alpha_other));
+
+    if (!py_exec(
+            "glide.set_untextured()\n"
+            "glide.image(1, 0.0, 0.0, 1.0, 1.0)\n",
+            "<image-state-test>", EXEC_MODE, main_mod)) {
+        py_printexc();
+        g_failures++;
+    }
+
+    CHECK(g_last_color_func == GR_COMBINE_FUNCTION_LOCAL);
+    CHECK(g_last_color_factor == GR_COMBINE_FACTOR_NONE);
+    CHECK(g_last_color_local == GR_COMBINE_LOCAL_ITERATED);
+    CHECK(g_last_color_other == GR_COMBINE_OTHER_NONE);
+    CHECK(g_last_alpha_func == GR_COMBINE_FUNCTION_LOCAL);
+    CHECK(g_last_alpha_factor == GR_COMBINE_FACTOR_NONE);
+
+    if (!py_exec(
+            "glide.set_mode('flat')\n",
+            "<set-mode-flat>", EXEC_MODE, main_mod)) {
+        py_printexc();
+        g_failures++;
+    }
+    CHECK(g_last_color_func == GR_COMBINE_FUNCTION_LOCAL);
+    CHECK(g_last_color_local == GR_COMBINE_LOCAL_CONSTANT);
+    CHECK(g_last_color_other == GR_COMBINE_OTHER_NONE);
+    CHECK(g_last_alpha_func == GR_COMBINE_FUNCTION_LOCAL);
+    CHECK(g_last_alpha_local == GR_COMBINE_LOCAL_CONSTANT);
+    CHECK(g_last_rgb_sf == GR_BLEND_ONE);
+    CHECK(g_last_rgb_df == GR_BLEND_ZERO);
+
+    if (!py_exec(
+            "glide.set_mode('gouraud')\n",
+            "<set-mode-gouraud>", EXEC_MODE, main_mod)) {
+        py_printexc();
+        g_failures++;
+    }
+    CHECK(g_last_color_func == GR_COMBINE_FUNCTION_LOCAL);
+    CHECK(g_last_color_factor == GR_COMBINE_FACTOR_NONE);
+    CHECK(g_last_color_local == GR_COMBINE_LOCAL_ITERATED);
+    CHECK(g_last_color_other == GR_COMBINE_OTHER_NONE);
+
+    if (!py_exec(
+            "glide.set_mode('textured')\n",
+            "<set-mode-textured>", EXEC_MODE, main_mod)) {
+        py_printexc();
+        g_failures++;
+    }
+    CHECK(g_last_color_func == GR_COMBINE_FUNCTION_SCALE_OTHER);
+    CHECK(g_last_color_factor == GR_COMBINE_FACTOR_LOCAL);
+    CHECK(g_last_color_local == GR_COMBINE_LOCAL_CONSTANT);
+    CHECK(g_last_color_other == GR_COMBINE_OTHER_TEXTURE);
+
+    if (!py_exec(
+            "glide.set_mode('textured_gouraud')\n",
+            "<set-mode-textured-gouraud>", EXEC_MODE, main_mod)) {
+        py_printexc();
+        g_failures++;
+    }
+    CHECK(g_last_color_func == GR_COMBINE_FUNCTION_SCALE_OTHER);
+    CHECK(g_last_color_factor == GR_COMBINE_FACTOR_LOCAL);
+    CHECK(g_last_color_local == GR_COMBINE_LOCAL_ITERATED);
+    CHECK(g_last_color_other == GR_COMBINE_OTHER_TEXTURE);
+
+    if (!py_exec(
+            "glide.set_mode('transparent')\n",
+            "<set-mode-transparent>", EXEC_MODE, main_mod)) {
+        py_printexc();
+        g_failures++;
+    }
+    CHECK(g_last_color_func == GR_COMBINE_FUNCTION_SCALE_OTHER);
+    CHECK(g_last_color_factor == GR_COMBINE_FACTOR_LOCAL);
+    CHECK(g_last_rgb_sf == GR_BLEND_SRC_ALPHA);
+    CHECK(g_last_rgb_df == GR_BLEND_ONE_MINUS_SRC_ALPHA);
+
+    if (!py_exec(
+            "glide.triangle(glide.Vertex(1.0, 2.0, 0.0, 1.0, (0.5, 0.25, 0.1, 0.75)),"
+            "              glide.vertex(3.0, 4.0),"
+            "              glide.vertex(5.0, 6.0))\n",
+            "<vertex-alpha-test>", EXEC_MODE, main_mod)) {
+        py_printexc();
+        g_failures++;
+    }
+    CHECK(nearf(g_last_triangle[0].a, 0.75f));
+    CHECK(nearf(g_last_triangle[1].a, 1.0f));
+    CHECK(nearf(g_last_triangle[2].a, 1.0f));
+    CHECK(nearf(g_last_triangle[0].r, 0.5f));
 
     glBindingsSetHost(NULL);
     py_finalize();

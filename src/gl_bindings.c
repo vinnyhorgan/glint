@@ -86,10 +86,12 @@ static const char *kBindingsBootstrap[] = {
     "    r, g, b, a = _unpack_rgba(color)\n"
     "    buffer_clear(color_pack(r, g, b, a), _alpha_byte(a), depth)\n"
     "\n"
-    "def swap():\n"
-    "    buffer_swap_current()\n"
-    "\n"
-    "def triangle(v0, v1, v2):\n"
+"def swap():\n"
+"    buffer_swap_current()\n"
+"\n"
+"buffer_swap = swap\n"
+"\n"
+"def triangle(v0, v1, v2):\n"
     "    draw_triangle(_coerce_vertex(v0), _coerce_vertex(v1), _coerce_vertex(v2))\n"
     "\n"
     "def point(v):\n"
@@ -110,9 +112,8 @@ static const char *kBindingsBootstrap[] = {
     "    v3 = vertex(x, y + h, z, 1.0, color, 0.0, 1.0)\n"
     "    quad(v0, v1, v2, v3)\n"
     "\n"
-    "def image(tex, x, y, w, h, color=(1.0, 1.0, 1.0, 1.0), z=0.0, u0=0.0, v0=0.0, u1=1.0, v1=1.0):\n"
-    "    set_textured_modulate()\n"
-    "    tex_bind(tex)\n"
+"def image(tex, x, y, w, h, color=(1.0, 1.0, 1.0, 1.0), z=0.0, u0=0.0, v0=0.0, u1=1.0, v1=1.0):\n"
+"    tex_bind(tex)\n"
     "    q0 = vertex(x, y, z, 1.0, color, u0, v0)\n"
     "    q1 = vertex(x + w, y, z, 1.0, color, u1, v0)\n"
     "    q2 = vertex(x + w, y + h, z, 1.0, color, u1, v1)\n"
@@ -209,11 +210,11 @@ static const char *kBindingsBootstrap[] = {
     "    depth_buffer_function(CMP_LESS)\n"
     "    depth_mask(True)\n"
     "\n",
-    "def mouse_x():\n"
-    "    return mouse_position()[0]\n"
-    "\n"
-    "def mouse_y():\n"
-    "    return mouse_position()[1]\n",
+"def mouse_x():\n"
+"    return int(mouse_position()[0])\n"
+"\n"
+"def mouse_y():\n"
+"    return int(mouse_position()[1])\n",
 };
 
 static bool exec_bootstrap(py_Ref module)
