@@ -183,6 +183,25 @@ static const char *normalize_key_name(int key, char out[2])
         case GLFW_KEY_LEFT_ALT:
         case GLFW_KEY_RIGHT_ALT:
             return "alt";
+        case GLFW_KEY_BACKSPACE: return "backspace";
+        case GLFW_KEY_DELETE: return "delete";
+        case GLFW_KEY_INSERT: return "insert";
+        case GLFW_KEY_HOME: return "home";
+        case GLFW_KEY_END: return "end";
+        case GLFW_KEY_PAGE_UP: return "pageup";
+        case GLFW_KEY_PAGE_DOWN: return "pagedown";
+        case GLFW_KEY_F1: return "f1";
+        case GLFW_KEY_F2: return "f2";
+        case GLFW_KEY_F3: return "f3";
+        case GLFW_KEY_F4: return "f4";
+        case GLFW_KEY_F5: return "f5";
+        case GLFW_KEY_F6: return "f6";
+        case GLFW_KEY_F7: return "f7";
+        case GLFW_KEY_F8: return "f8";
+        case GLFW_KEY_F9: return "f9";
+        case GLFW_KEY_F10: return "f10";
+        case GLFW_KEY_F11: return "f11";
+        case GLFW_KEY_F12: return "f12";
         default:
             return NULL;
     }

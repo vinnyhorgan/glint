@@ -1,4 +1,5 @@
 #include "gl.h"
+#include "gl_core.h"
 #include "gl_bindings.h"
 
 #include <stdbool.h>
@@ -68,15 +69,6 @@ static int nearf(float a, float b)
 {
     float d = a - b;
     return d < 0.0f ? -d < 1e-4f : d < 1e-4f;
-}
-
-static uint8_t float_to_byte(float value)
-{
-    if (value <= 0.0f)
-        return 0;
-    if (value >= 1.0f)
-        return 255;
-    return (uint8_t)(value * 255.0f + 0.5f);
 }
 
 static double test_host_time_now(void *userdata)
@@ -281,10 +273,10 @@ void grDrawLine(const GrVertex *v0, const GrVertex *v1)
 
 GrColor_t grColorPack(float r, float g, float b, float a)
 {
-    return ((uint32_t)float_to_byte(a) << 24)
-         | ((uint32_t)float_to_byte(b) << 16)
-         | ((uint32_t)float_to_byte(g) << 8)
-         | (uint32_t)float_to_byte(r);
+    return ((uint32_t)grCoreFloatToByte(a) << 24)
+         | ((uint32_t)grCoreFloatToByte(b) << 16)
+         | ((uint32_t)grCoreFloatToByte(g) << 8)
+         | (uint32_t)grCoreFloatToByte(r);
 }
 
 void grColorUnpack(GrColor_t c, float *r, float *g, float *b, float *a)
@@ -533,6 +525,65 @@ int run_gl_bindings_tests(void)
     CHECK(nearf(g_last_triangle[1].a, 1.0f));
     CHECK(nearf(g_last_triangle[2].a, 1.0f));
     CHECK(nearf(g_last_triangle[0].r, 0.5f));
+
+    /* Test Vertex color normalization: 0-255 values should be divided by 255 */
+    if (!py_exec(
+            "def _near(a, b, eps=1e-4):\n"
+            "    return abs(a - b) < eps\n"
+            "v = glide.Vertex(1.0, 2.0, color=(255, 128, 64, 255))\n"
+            "assert _near(v.r, 1.0), v.r\n"
+            "assert _near(v.g, 128.0/255.0), v.g\n"
+            "assert _near(v.b, 64.0/255.0), v.b\n"
+            "assert _near(v.a, 1.0), v.a\n"
+            "v2 = glide.Vertex(3.0, 4.0, color=(0.5, 0.25, 0.1, 0.75))\n"
+            "assert _near(v2.r, 0.5), v2.r\n"
+            "assert _near(v2.g, 0.25), v2.g\n"
+            "assert _near(v2.b, 0.1), v2.b\n"
+            "assert _near(v2.a, 0.75), v2.a\n"
+            "glide.triangle(v, v2, glide.vertex(5.0, 6.0))\n",
+            "<vertex-color-normalize-test>", EXEC_MODE, main_mod)) {
+        py_printexc();
+        g_failures++;
+    }
+    CHECK(nearf(g_last_triangle[0].r, 1.0f));
+    CHECK(nearf(g_last_triangle[0].g, 128.0f / 255.0f));
+    CHECK(nearf(g_last_triangle[0].b, 64.0f / 255.0f));
+    CHECK(nearf(g_last_triangle[0].a, 1.0f));
+    CHECK(nearf(g_last_triangle[1].r, 0.5f));
+
+    /* Test new key name mappings */
+    if (!py_exec(
+            "assert glide.key_down('f1') == False\n"
+            "assert glide.key_down('f12') == False\n"
+            "assert glide.key_down('backspace') == False\n"
+            "assert glide.key_down('delete') == False\n"
+            "assert glide.key_down('insert') == False\n"
+            "assert glide.key_down('home') == False\n"
+            "assert glide.key_down('end') == False\n"
+            "assert glide.key_down('pageup') == False\n"
+            "assert glide.key_down('pagedown') == False\n"
+            "assert glide.key_down(290) == False\n"  /* f1 keycode */
+            "assert glide.key_down(259) == False\n" /* backspace keycode */
+            ,
+            "<key-names-test>", EXEC_MODE, main_mod)) {
+        py_printexc();
+        g_failures++;
+    }
+
+    /* Test color_pack clamping */
+    if (!py_exec(
+            "def _near(a, b, eps=1e-4):\n"
+            "    return abs(a - b) < eps\n"
+            "c = glide.color_pack(-0.5, 1.5, 0.5, 2.0)\n"
+            "r, g, b, a = glide.color_unpack(c)\n"
+            "assert _near(r, 0.0), r\n"
+            "assert _near(g, 1.0), g\n"
+            "assert _near(b, 128.0/255.0), b\n"
+            "assert _near(a, 1.0), a\n",
+            "<color-clamp-test>", EXEC_MODE, main_mod)) {
+        py_printexc();
+        g_failures++;
+    }
 
     glBindingsSetHost(NULL);
     py_finalize();

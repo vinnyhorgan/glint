@@ -157,6 +157,126 @@ static void test_blit_rect(void)
     CHECK(y == 60);
 }
 
+static void test_color_clamp(void)
+{
+    GrColor4f color = {-0.5f, 0.5f, 1.5f, 0.5f};
+    GrColor4f unpacked;
+    GrColor_t packed = grCorePackColor(&color);
+    grCoreUnpackColor(packed, &unpacked);
+    CHECK(nearf(unpacked.r, 0.0f));
+    CHECK(nearf(unpacked.g, 128.0f / 255.0f));
+    CHECK(nearf(unpacked.b, 1.0f));
+    CHECK(nearf(unpacked.a, 128.0f / 255.0f));
+}
+
+static void test_depth_test_all(void)
+{
+    CHECK(grCoreDepthTestPass(GR_CMP_NEVER, 0.2f, 0.4f) == false);
+    CHECK(grCoreDepthTestPass(GR_CMP_LESS, 0.2f, 0.4f) == true);
+    CHECK(grCoreDepthTestPass(GR_CMP_LESS, 0.4f, 0.2f) == false);
+    CHECK(grCoreDepthTestPass(GR_CMP_EQUAL, 0.3f, 0.3f) == true);
+    CHECK(grCoreDepthTestPass(GR_CMP_EQUAL, 0.3f, 0.4f) == false);
+    CHECK(grCoreDepthTestPass(GR_CMP_LEQUAL, 0.3f, 0.3f) == true);
+    CHECK(grCoreDepthTestPass(GR_CMP_LEQUAL, 0.2f, 0.4f) == true);
+    CHECK(grCoreDepthTestPass(GR_CMP_LEQUAL, 0.5f, 0.4f) == false);
+    CHECK(grCoreDepthTestPass(GR_CMP_GREATER, 0.5f, 0.4f) == true);
+    CHECK(grCoreDepthTestPass(GR_CMP_GREATER, 0.3f, 0.3f) == false);
+    CHECK(grCoreDepthTestPass(GR_CMP_NOTEQUAL, 0.3f, 0.4f) == true);
+    CHECK(grCoreDepthTestPass(GR_CMP_NOTEQUAL, 0.3f, 0.3f) == false);
+    CHECK(grCoreDepthTestPass(GR_CMP_GEQUAL, 0.5f, 0.4f) == true);
+    CHECK(grCoreDepthTestPass(GR_CMP_GEQUAL, 0.3f, 0.3f) == true);
+    CHECK(grCoreDepthTestPass(GR_CMP_GEQUAL, 0.2f, 0.4f) == false);
+    CHECK(grCoreDepthTestPass(GR_CMP_ALWAYS, 0.2f, 0.4f) == true);
+}
+
+static void test_alpha_test_all(void)
+{
+    CHECK(grCoreAlphaTestPass(GR_CMP_NEVER, 128, 128.0f / 255.0f) == false);
+    CHECK(grCoreAlphaTestPass(GR_CMP_LESS, 128, 127.0f / 255.0f) == true);
+    CHECK(grCoreAlphaTestPass(GR_CMP_LESS, 128, 128.0f / 255.0f) == false);
+    CHECK(grCoreAlphaTestPass(GR_CMP_EQUAL, 128, 128.0f / 255.0f) == true);
+    CHECK(grCoreAlphaTestPass(GR_CMP_EQUAL, 128, 127.0f / 255.0f) == false);
+    CHECK(grCoreAlphaTestPass(GR_CMP_LEQUAL, 128, 128.0f / 255.0f) == true);
+    CHECK(grCoreAlphaTestPass(GR_CMP_LEQUAL, 128, 127.0f / 255.0f) == true);
+    CHECK(grCoreAlphaTestPass(GR_CMP_LEQUAL, 128, 129.0f / 255.0f) == false);
+    CHECK(grCoreAlphaTestPass(GR_CMP_GREATER, 128, 129.0f / 255.0f) == true);
+    CHECK(grCoreAlphaTestPass(GR_CMP_GREATER, 128, 128.0f / 255.0f) == false);
+    CHECK(grCoreAlphaTestPass(GR_CMP_NOTEQUAL, 128, 127.0f / 255.0f) == true);
+    CHECK(grCoreAlphaTestPass(GR_CMP_NOTEQUAL, 128, 128.0f / 255.0f) == false);
+    CHECK(grCoreAlphaTestPass(GR_CMP_GEQUAL, 128, 129.0f / 255.0f) == true);
+    CHECK(grCoreAlphaTestPass(GR_CMP_GEQUAL, 128, 128.0f / 255.0f) == true);
+    CHECK(grCoreAlphaTestPass(GR_CMP_GEQUAL, 128, 127.0f / 255.0f) == false);
+    CHECK(grCoreAlphaTestPass(GR_CMP_ALWAYS, 128, 128.0f / 255.0f) == true);
+}
+
+static void test_combine_local(void)
+{
+    GrColor4f iterated = {0.25f, 0.5f, 0.75f, 0.6f};
+    GrColor4f texture = {0.8f, 0.4f, 0.2f, 0.5f};
+    GrColor4f constant = {1.0f, 0.5f, 0.25f, 0.75f};
+    GrColor4f out;
+    float alpha;
+
+    out = grCoreEvalColorCombine(GR_COMBINE_FUNCTION_LOCAL, GR_COMBINE_FACTOR_NONE,
+                                 GR_COMBINE_LOCAL_ITERATED, GR_COMBINE_OTHER_NONE, false,
+                                 iterated, texture, constant, 0.0f);
+    CHECK(nearf(out.r, 0.25f));
+    CHECK(nearf(out.g, 0.5f));
+    CHECK(nearf(out.b, 0.75f));
+
+    out = grCoreEvalColorCombine(GR_COMBINE_FUNCTION_LOCAL, GR_COMBINE_FACTOR_NONE,
+                                 GR_COMBINE_LOCAL_CONSTANT, GR_COMBINE_OTHER_NONE, false,
+                                 iterated, texture, constant, 0.0f);
+    CHECK(nearf(out.r, 1.0f));
+    CHECK(nearf(out.g, 0.5f));
+    CHECK(nearf(out.b, 0.25f));
+
+    alpha = grCoreEvalAlphaCombine(GR_COMBINE_FUNCTION_LOCAL, GR_COMBINE_FACTOR_NONE,
+                                   GR_COMBINE_LOCAL_ITERATED, GR_COMBINE_OTHER_NONE, false,
+                                   iterated, texture, constant, 0.0f);
+    CHECK(nearf(alpha, 0.6f));
+}
+
+static void test_window_to_ndc(void)
+{
+    float ndc_x, ndc_y;
+    grCoreWindowToNdc(160.0f, 120.0f, &ndc_x, &ndc_y);
+    CHECK(nearf(ndc_x, 0.0f));
+    CHECK(nearf(ndc_y, 0.0f));
+    grCoreWindowToNdc(320.0f, 240.0f, &ndc_x, &ndc_y);
+    CHECK(nearf(ndc_x, 1.0f));
+    CHECK(nearf(ndc_y, -1.0f));
+}
+
+static void test_blit_rect_various(void)
+{
+    int x, y, w, h;
+    /* Tall window: height is limiting factor */
+    grCoreComputeBlitRect(640, 1080, &x, &y, &w, &h);
+    CHECK(w == 640);
+    CHECK(h == 480);
+    CHECK(x == 0);
+    CHECK(y == 300);
+    /* Exact match */
+    grCoreComputeBlitRect(640, 480, &x, &y, &w, &h);
+    CHECK(w == 640);
+    CHECK(h == 480);
+    CHECK(x == 0);
+    CHECK(y == 0);
+    /* Smaller than framebuffer: scale clamped to 1, centered (negative x/y) */
+    grCoreComputeBlitRect(160, 120, &x, &y, &w, &h);
+    CHECK(w == 320);
+    CHECK(h == 240);
+    CHECK(x == -80);
+    CHECK(y == -60);
+    /* Exact framebuffer size */
+    grCoreComputeBlitRect(320, 240, &x, &y, &w, &h);
+    CHECK(w == 320);
+    CHECK(h == 240);
+    CHECK(x == 0);
+    CHECK(y == 0);
+}
+
 int main(void)
 {
     test_defaults();
@@ -168,6 +288,12 @@ int main(void)
     test_alpha_and_depth();
     test_cull_and_coords();
     test_blit_rect();
+    test_color_clamp();
+    test_depth_test_all();
+    test_alpha_test_all();
+    test_combine_local();
+    test_window_to_ndc();
+    test_blit_rect_various();
     g_failures += run_gl_bindings_tests();
 
     if (g_failures != 0) {

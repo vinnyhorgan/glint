@@ -681,8 +681,10 @@ int grInit(int win_w, int win_h)
     g_gl.blit_prog = link_program(kBlitVs, (GLsizei)(sizeof(kBlitVs) / sizeof(kBlitVs[0])),
                                   kBlitFs, (GLsizei)(sizeof(kBlitFs) / sizeof(kBlitFs[0])),
                                   false);
-    if (!g_gl.render_prog || !g_gl.blit_prog)
+    if (!g_gl.render_prog || !g_gl.blit_prog) {
+        grShutdown();
         return 0;
+    }
 
     g_gl.render_u_has_tex = glGetUniformLocation(g_gl.render_prog, "u_has_tex");
     g_gl.render_u_tex = glGetUniformLocation(g_gl.render_prog, "u_tex");
@@ -769,13 +771,14 @@ void grBufferClear(GrColor_t color, GrAlpha_t alpha, GrDepth_t depth)
     set_scissor_rect();
     glClearColor(c.r, c.g, c.b, c.a);
     glClearDepthf((GLfloat)depth / 65535.0f);
-    if (g_gl.core.depth_mode != GR_DEPTHBUFFER_DISABLE && g_gl.core.depth_mask)
-        glDepthMask(GL_TRUE);
-    glClear(GL_COLOR_BUFFER_BIT |
-            ((g_gl.core.depth_mode != GR_DEPTHBUFFER_DISABLE && g_gl.core.depth_mask)
-                 ? GL_DEPTH_BUFFER_BIT
-                 : 0));
-    glDepthMask(g_gl.core.depth_mask ? GL_TRUE : GL_FALSE);
+    if (g_gl.core.depth_mode != GR_DEPTHBUFFER_DISABLE) {
+        if (!g_gl.core.depth_mask)
+            glDepthMask(GL_TRUE);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glDepthMask(g_gl.core.depth_mask ? GL_TRUE : GL_FALSE);
+    } else {
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
 }
 
 void grBufferSwap(struct GLFWwindow *window)

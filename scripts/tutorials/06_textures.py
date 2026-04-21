@@ -221,6 +221,41 @@ def draw():
     )
 
     # =====================================================================
+    # TEXTURE CLAMPING — wrap vs clamp-to-edge
+    # =====================================================================
+    # By default textures WRAP (repeat) when UVs go outside 0-1.
+    # With CLAMP, the edge pixel is stretched instead.
+    #
+    # Here we draw the same checkerboard with UVs from -0.5 to 1.5
+    # (showing 2x2 repeats). The top uses WRAP (default), the bottom
+    # uses CLAMP (no repetition, just edge stretching).
+
+    g.set_mode("textured")
+
+    # WRAP texture (default) — the checkerboard tiles repeatedly
+    g.tex_bind(state["tex0"])
+    g.quad(
+        g.vertex(165.0, 165.0, u=-0.5, v=-0.5),
+        g.vertex(235.0, 165.0, u=1.5,  v=-0.5),
+        g.vertex(235.0, 200.0, u=1.5,  v=1.5),
+        g.vertex(165.0, 200.0, u=-0.5, v=1.5),
+    )
+
+    # CLAMP texture — edge pixels stretch, no tiling
+    tex_clamp = g.upload_texture(
+        32, 32, make_checkerboard(32, 4),
+        s_clamp=g.TEXTURECLAMP_CLAMP,
+        t_clamp=g.TEXTURECLAMP_CLAMP,
+    )
+    g.tex_bind(tex_clamp)
+    g.quad(
+        g.vertex(245.0, 165.0, u=-0.5, v=-0.5),
+        g.vertex(315.0, 165.0, u=1.5,  v=-0.5),
+        g.vertex(315.0, 200.0, u=1.5,  v=1.5),
+        g.vertex(245.0, 200.0, u=-0.5, v=1.5),
+    )
+
+    # =====================================================================
     # SCALED AND ROTATED TEXTURE (manual vertex placement)
     # =====================================================================
     # By placing vertices at arbitrary positions, we can skew, scale, and

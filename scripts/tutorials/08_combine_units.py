@@ -143,13 +143,15 @@ def draw():
     )
 
     # =====================================================================
-    # SCALE_OTHER_MINUS_LOCAL — subtractive blending
+    # SCALE_OTHER_MINUS_LOCAL_ADD_LOCAL — highlight blending
     # =====================================================================
-    # COMBINE_FUNCTION_SCALE_OTHER_MINUS_LOCAL computes: factor * (other - local)
-    # This can be used for edge detection, emboss, and other effects.
+    # COMBINE_FUNCTION_SCALE_OTHER_MINUS_LOCAL_ADD_LOCAL computes:
+    #   factor * (other - local) + local
+    # With factor=1 this simplifies to 'other', but with partial factors
+    # it creates highlight and emboss-like effects.
 
     g.color_combine(
-        g.COMBINE_FUNCTION_SCALE_OTHER_MINUS_LOCAL_ADD_LOCAL,  # factor*(other-local)+local
+        g.COMBINE_FUNCTION_SCALE_OTHER_MINUS_LOCAL_ADD_LOCAL,
         g.COMBINE_FACTOR_ONE,
         g.COMBINE_LOCAL_ITERATED,
         g.COMBINE_OTHER_CONSTANT,

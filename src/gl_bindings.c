@@ -43,10 +43,10 @@ static const char *kBindingsBootstrap[] = {
     "        self.y = y\n"
     "        self.z = z\n"
     "        self.oow = oow\n"
-    "        self.r = r\n"
-    "        self.g = g\n"
-    "        self.b = b\n"
-    "        self.a = a\n"
+    "        self.r = _color_component(r)\n"
+    "        self.g = _color_component(g)\n"
+    "        self.b = _color_component(b)\n"
+    "        self.a = _color_component(a)\n"
     "        self.u = u\n"
     "        self.v = v\n"
     "\n"
@@ -344,6 +344,25 @@ static int parse_key_code(py_Ref value, int *out)
     else if (strcmp(s, "rctrl") == 0) *out = 345;
     else if (strcmp(s, "lalt") == 0 || strcmp(s, "alt") == 0) *out = 342;
     else if (strcmp(s, "ralt") == 0) *out = 346;
+    else if (strcmp(s, "backspace") == 0) *out = 259;
+    else if (strcmp(s, "delete") == 0) *out = 261;
+    else if (strcmp(s, "insert") == 0) *out = 260;
+    else if (strcmp(s, "home") == 0) *out = 268;
+    else if (strcmp(s, "end") == 0) *out = 269;
+    else if (strcmp(s, "pageup") == 0) *out = 266;
+    else if (strcmp(s, "pagedown") == 0) *out = 267;
+    else if (strcmp(s, "f1") == 0) *out = 290;
+    else if (strcmp(s, "f2") == 0) *out = 291;
+    else if (strcmp(s, "f3") == 0) *out = 292;
+    else if (strcmp(s, "f4") == 0) *out = 293;
+    else if (strcmp(s, "f5") == 0) *out = 294;
+    else if (strcmp(s, "f6") == 0) *out = 295;
+    else if (strcmp(s, "f7") == 0) *out = 296;
+    else if (strcmp(s, "f8") == 0) *out = 297;
+    else if (strcmp(s, "f9") == 0) *out = 298;
+    else if (strcmp(s, "f10") == 0) *out = 299;
+    else if (strcmp(s, "f11") == 0) *out = 300;
+    else if (strcmp(s, "f12") == 0) *out = 301;
     else return 0;
     return 1;
 }

@@ -135,28 +135,34 @@ def draw():
     # PART 4: ALL 8 COMPARISON FUNCTIONS
     # =====================================================================
     # A visual reference showing what each function does.
-    # Each bar has alpha going from 0.0 to 1.0 left-to-right.
-    # Pixels where the test fails are not drawn.
+    # Each bar has alpha going from 0 to 255 left-to-right.
+    # Pixels where the test fails are not drawn (you see the checkerboard
+    # background showing through).
 
     funcs = [
-        (g.CMP_NEVER,    "NEVER"),
-        (g.CMP_LESS,     "LESS"),
-        (g.CMP_EQUAL,    "EQUAL"),
-        (g.CMP_LEQUAL,   "LEQUAL"),
+        (g.CMP_NEVER,    "NEVER  "),
+        (g.CMP_LESS,     "LESS   "),
+        (g.CMP_EQUAL,    "EQUAL  "),
+        (g.CMP_LEQUAL,   "LEQUAL "),
         (g.CMP_GREATER,  "GREATER"),
-        (g.CMP_NOTEQUAL, "NOTEQUAL"),
-        (g.CMP_GEQUAL,   "GEQUAL"),
-        (g.CMP_ALWAYS,   "ALWAYS"),
+        (g.CMP_NOTEQUAL, "NOTEQ  "),
+        (g.CMP_GEQUAL,   "GEQUAL "),
+        (g.CMP_ALWAYS,   "ALWAYS "),
     ]
 
-    # Reference value at 0.5 (128)
+    g.set_blend_none()
     g.alpha_test_reference_value(128)
 
-    for i, (func, _) in enumerate(funcs):
-        y = 0.0 + i * 3.0
-        # Scale to fit in a small area at the bottom
-        # We'll just show small indicator dots
-        pass  # skip rendering this, already demonstrated above
+    for i, (func, label) in enumerate(funcs):
+        y_base = 4.0 + i * 3.0
+        g.alpha_test_function(func)
+        # Draw a thin bar with alpha gradient from 0 (left) to 255 (right)
+        for j in range(32):
+            alpha = int((j / 31.0) * 255.0)
+            px = 5.0 + j * 4.5
+            g.rect(px, y_base, 4.0, 2.5, (0.3, 0.7, 1.0, alpha / 255.0))
+
+    g.alpha_test_function(g.CMP_ALWAYS)
 
     # =====================================================================
     # PART 5: COMBINED ALPHA TEST + BLEND
