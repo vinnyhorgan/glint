@@ -12,6 +12,8 @@ typedef struct GlBindingHost {
     int (*key_down)(void *userdata, int key);
     int (*key_pressed)(void *userdata, int key);
     int (*mouse_down)(void *userdata, int button);
+    int (*mouse_pressed)(void *userdata, int button);
+    int (*mouse_released)(void *userdata, int button);
     void (*mouse_position)(void *userdata, float *x, float *y);
     void (*framebuffer_size)(void *userdata, int *w, int *h);
     void (*set_title)(void *userdata, const char *title);

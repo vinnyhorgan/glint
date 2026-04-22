@@ -123,7 +123,7 @@ typedef enum {
     GR_SHADE_ST = 1 << 2,
     GR_SHADE_Z = 1 << 3,
     GR_SHADE_W = 1 << 4,
-    GR_SHADE_FLAT = GR_SHADE_COLOR | GR_SHADE_ALPHA | GR_SHADE_ST | GR_SHADE_Z | GR_SHADE_W,
+    GR_SHADE_FLAT = GR_SHADE_COLOR,
 } GrShadeModel_t;
 
 typedef enum {

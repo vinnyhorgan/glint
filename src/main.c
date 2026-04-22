@@ -19,6 +19,8 @@ typedef struct {
     double time_now;
     double delta_time;
     unsigned char pressed_keys[GLFW_KEY_LAST + 1];
+    unsigned char pressed_buttons[3];
+    unsigned char released_buttons[3];
 } RuntimeHost;
 
 typedef struct {
@@ -87,6 +89,22 @@ static int host_mouse_down(void *userdata, int button)
 {
     RuntimeHost *host = (RuntimeHost *)userdata;
     return glfwGetMouseButton(host->window, button) == GLFW_PRESS;
+}
+
+static int host_mouse_pressed(void *userdata, int button)
+{
+    RuntimeHost *host = (RuntimeHost *)userdata;
+    if (button < 0 || button >= 3)
+        return 0;
+    return host->pressed_buttons[button] != 0;
+}
+
+static int host_mouse_released(void *userdata, int button)
+{
+    RuntimeHost *host = (RuntimeHost *)userdata;
+    if (button < 0 || button >= 3)
+        return 0;
+    return host->released_buttons[button] != 0;
 }
 
 static void host_mouse_position(void *userdata, float *x, float *y)
@@ -242,6 +260,18 @@ static void key_cb(GLFWwindow *window, int key, int scancode, int action, int mo
         dispatch_key_event(&g_script_hooks.keyup_func, "keyup(key)", key);
 }
 
+static void mouse_button_cb(GLFWwindow *window, int button, int action, int mods)
+{
+    (void)window;
+    (void)mods;
+    if (g_runtime_host == NULL || button < 0 || button >= 3)
+        return;
+    if (action == GLFW_PRESS)
+        g_runtime_host->pressed_buttons[button] = 1;
+    if (action == GLFW_RELEASE)
+        g_runtime_host->released_buttons[button] = 1;
+}
+
 static void framebuffer_size_cb(GLFWwindow *window, int width, int height)
 {
     (void)window;
@@ -378,6 +408,7 @@ int main(int argc, char **argv)
     glfwMakeContextCurrent(window);
     glfwSetWindowOpacity(window, 1.0f);
     glfwSetKeyCallback(window, key_cb);
+    glfwSetMouseButtonCallback(window, mouse_button_cb);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_cb);
     glfwSetWindowRefreshCallback(window, window_refresh_cb);
     glfwSwapInterval(1);
@@ -400,6 +431,8 @@ int main(int argc, char **argv)
     binding_host.key_down = host_key_down;
     binding_host.key_pressed = host_key_pressed;
     binding_host.mouse_down = host_mouse_down;
+    binding_host.mouse_pressed = host_mouse_pressed;
+    binding_host.mouse_released = host_mouse_released;
     binding_host.mouse_position = host_mouse_position;
     binding_host.framebuffer_size = host_framebuffer_size;
     binding_host.set_title = host_set_title;
@@ -449,6 +482,8 @@ int main(int argc, char **argv)
         double now;
 
         memset(host.pressed_keys, 0, sizeof(host.pressed_keys));
+        memset(host.pressed_buttons, 0, sizeof(host.pressed_buttons));
+        memset(host.released_buttons, 0, sizeof(host.released_buttons));
         glfwPollEvents();
         if (g_needs_resize_repaint) {
             present_black(window);

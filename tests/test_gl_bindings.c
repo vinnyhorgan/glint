@@ -101,6 +101,18 @@ static int test_host_mouse_down(void *userdata, int button)
     return button == 1;
 }
 
+static int test_host_mouse_pressed(void *userdata, int button)
+{
+    (void)userdata;
+    return button == 0;
+}
+
+static int test_host_mouse_released(void *userdata, int button)
+{
+    (void)userdata;
+    return button == 2;
+}
+
 static void test_host_mouse_position(void *userdata, float *x, float *y)
 {
     (void)userdata;
@@ -301,6 +313,8 @@ int run_gl_bindings_tests(void)
     host.key_down = test_host_key_down;
     host.key_pressed = test_host_key_pressed;
     host.mouse_down = test_host_mouse_down;
+    host.mouse_pressed = test_host_mouse_pressed;
+    host.mouse_released = test_host_mouse_released;
     host.mouse_position = test_host_mouse_position;
     host.framebuffer_size = test_host_framebuffer_size;
     host.set_title = test_host_set_title;
@@ -325,12 +339,14 @@ int run_gl_bindings_tests(void)
             "assert glide.key_down('a')\n"
             "assert glide.key_pressed('space')\n"
             "assert glide.mouse_down('right')\n"
+            "assert glide.mouse_pressed('left')\n"
+            "assert glide.mouse_released('middle')\n"
             "assert glide.mouse_position() == (123.0, 45.0)\n"
-"assert glide.mouse_x() == 123\n"
-"assert glide.mouse_y() == 45\n"
-"assert isinstance(glide.mouse_x(), int)\n"
-"assert isinstance(glide.mouse_y(), int)\n"
-            "assert glide.screen_size() == (960, 720)\n"
+            "assert glide.mouse_x() == 123\n"
+            "assert glide.mouse_y() == 45\n"
+            "assert isinstance(glide.mouse_x(), int)\n"
+            "assert isinstance(glide.mouse_y(), int)\n"
+            "assert glide.screen_size() == (320, 240)\n"
             "assert glide.color_tuple(packed)[0] == 1.0\n"
             "v0 = glide.vertex(10.0, 20.0, 0.25, 0.5, packed, 0.75, 0.125)\n"
             "v1 = v0.copy()\n"
@@ -342,8 +358,8 @@ int run_gl_bindings_tests(void)
             "fog = glide.make_fog_table(2.0, 10.0)\n"
             "assert len(fog) == glide.FOG_TABLE_SIZE\n"
             "assert fog[0] == 0\n"
-            "glide.triangle((1.0, 2.0), (3.0, 4.0, 0.25, 0.5), (5.0, 6.0, 128, 64, 32))\n"
-            "glide.triangle((7.0, 8.0, 255, 128, 0, 0.25, 0.75), (9.0, 10.0, 0.5, 255, 255, 255, 1.0, 0.0), v0)\n"
+            "glide.triangle((1.0, 2.0), (3.0, 4.0, 0.25, 0.5), (5.0, 6.0, 0.5, 0.25, 0.125))\n"
+             "glide.triangle((7.0, 8.0, 1.0, 0.5, 0.0, 0.25, 0.75), (9.0, 10.0, 0.5, 1.0, 1.0, 1.0, 1.0, 0.0), v0)\n"
             "tex = glide.upload_texture(2, 1, [128, 1, 2, 3, 255, 4, 5, 6])\n"
             "assert tex == 1\n"
             "glide.set_textured_modulate()\n"
@@ -526,14 +542,14 @@ int run_gl_bindings_tests(void)
     CHECK(nearf(g_last_triangle[2].a, 1.0f));
     CHECK(nearf(g_last_triangle[0].r, 0.5f));
 
-    /* Test Vertex color normalization: 0-255 values should be divided by 255 */
+    /* Test Vertex color clamping: values outside 0-1 should be clamped */
     if (!py_exec(
             "def _near(a, b, eps=1e-4):\n"
             "    return abs(a - b) < eps\n"
-            "v = glide.Vertex(1.0, 2.0, color=(255, 128, 64, 255))\n"
+            "v = glide.Vertex(1.0, 2.0, color=(1.5, -0.2, 0.5, 2.0))\n"
             "assert _near(v.r, 1.0), v.r\n"
-            "assert _near(v.g, 128.0/255.0), v.g\n"
-            "assert _near(v.b, 64.0/255.0), v.b\n"
+            "assert _near(v.g, 0.0), v.g\n"
+            "assert _near(v.b, 0.5), v.b\n"
             "assert _near(v.a, 1.0), v.a\n"
             "v2 = glide.Vertex(3.0, 4.0, color=(0.5, 0.25, 0.1, 0.75))\n"
             "assert _near(v2.r, 0.5), v2.r\n"
@@ -541,13 +557,13 @@ int run_gl_bindings_tests(void)
             "assert _near(v2.b, 0.1), v2.b\n"
             "assert _near(v2.a, 0.75), v2.a\n"
             "glide.triangle(v, v2, glide.vertex(5.0, 6.0))\n",
-            "<vertex-color-normalize-test>", EXEC_MODE, main_mod)) {
+            "<vertex-color-clamp-test>", EXEC_MODE, main_mod)) {
         py_printexc();
         g_failures++;
     }
     CHECK(nearf(g_last_triangle[0].r, 1.0f));
-    CHECK(nearf(g_last_triangle[0].g, 128.0f / 255.0f));
-    CHECK(nearf(g_last_triangle[0].b, 64.0f / 255.0f));
+    CHECK(nearf(g_last_triangle[0].g, 0.0f));
+    CHECK(nearf(g_last_triangle[0].b, 0.5f));
     CHECK(nearf(g_last_triangle[0].a, 1.0f));
     CHECK(nearf(g_last_triangle[1].r, 0.5f));
 

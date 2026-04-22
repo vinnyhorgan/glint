@@ -60,8 +60,10 @@ static const char *kBindingsBootstrap[] = {
     "    return Vertex(x, y, z, oow, color, u, v)\n"
     "\n"
     "def _color_component(value):\n"
-    "    if value > 1.0 or value < 0.0:\n"
-    "        return value / 255.0\n"
+    "    if value > 1.0:\n"
+    "        return 1.0\n"
+    "    if value < 0.0:\n"
+    "        return 0.0\n"
     "    return value\n"
     "\n"
     "def _coerce_vertex(v):\n"
@@ -79,19 +81,19 @@ static const char *kBindingsBootstrap[] = {
     "    if n == 8:\n"
     "        return (v[0], v[1], v[2], 1.0, _color_component(v[3]), _color_component(v[4]), _color_component(v[5]), 1.0, v[6], v[7])\n"
     "    if n == 10:\n"
-    "        return v\n"
+    "        return (v[0], v[1], v[2], v[3], _color_component(v[4]), _color_component(v[5]), _color_component(v[6]), _color_component(v[7]), v[8], v[9])\n"
     "    raise ValueError('vertex must be glide.Vertex or a 2/4/5/7/8/10-item sequence')\n"
     "\n"
     "def clear(color=(0.0, 0.0, 0.0, 1.0), depth=0xFFFF):\n"
     "    r, g, b, a = _unpack_rgba(color)\n"
     "    buffer_clear(color_pack(r, g, b, a), _alpha_byte(a), depth)\n"
     "\n"
-"def swap():\n"
-"    buffer_swap_current()\n"
-"\n"
-"buffer_swap = swap\n"
-"\n"
-"def triangle(v0, v1, v2):\n"
+    "def swap():\n"
+    "    buffer_swap_current()\n"
+    "\n"
+    "buffer_swap = swap\n"
+    "\n"
+    "def triangle(v0, v1, v2):\n"
     "    draw_triangle(_coerce_vertex(v0), _coerce_vertex(v1), _coerce_vertex(v2))\n"
     "\n"
     "def point(v):\n"
@@ -112,8 +114,10 @@ static const char *kBindingsBootstrap[] = {
     "    v3 = vertex(x, y + h, z, 1.0, color, 0.0, 1.0)\n"
     "    quad(v0, v1, v2, v3)\n"
     "\n"
-"def image(tex, x, y, w, h, color=(1.0, 1.0, 1.0, 1.0), z=0.0, u0=0.0, v0=0.0, u1=1.0, v1=1.0):\n"
-"    tex_bind(tex)\n"
+    "def image(tex, x, y, w, h, color=(1.0, 1.0, 1.0, 1.0), z=0.0, u0=0.0, v0=0.0, u1=1.0, v1=1.0):\n"
+    "    if tex < 0:\n"
+    "        return\n"
+    "    tex_bind(tex)\n"
     "    q0 = vertex(x, y, z, 1.0, color, u0, v0)\n"
     "    q1 = vertex(x + w, y, z, 1.0, color, u1, v0)\n"
     "    q2 = vertex(x + w, y + h, z, 1.0, color, u1, v1)\n"
@@ -210,11 +214,11 @@ static const char *kBindingsBootstrap[] = {
     "    depth_buffer_function(CMP_LESS)\n"
     "    depth_mask(True)\n"
     "\n",
-"def mouse_x():\n"
-"    return int(mouse_position()[0])\n"
-"\n"
-"def mouse_y():\n"
-"    return int(mouse_position()[1])\n",
+    "def mouse_x():\n"
+    "    return int(mouse_position()[0])\n"
+    "\n"
+    "def mouse_y():\n"
+    "    return int(mouse_position()[1])\n",
 };
 
 static bool exec_bootstrap(py_Ref module)
@@ -413,9 +417,9 @@ static bool parse_vertex(py_Ref obj, GrVertex *out)
     }
     if (len == 5 || len == 7 || len == 8) {
         int color_index = len == 8 ? 3 : 2;
-        out->r = values[color_index + 0] > 1.0f ? values[color_index + 0] / 255.0f : values[color_index + 0];
-        out->g = values[color_index + 1] > 1.0f ? values[color_index + 1] / 255.0f : values[color_index + 1];
-        out->b = values[color_index + 2] > 1.0f ? values[color_index + 2] / 255.0f : values[color_index + 2];
+        out->r = values[color_index + 0] > 1.0f ? 1.0f : (values[color_index + 0] < 0.0f ? 0.0f : values[color_index + 0]);
+        out->g = values[color_index + 1] > 1.0f ? 1.0f : (values[color_index + 1] < 0.0f ? 0.0f : values[color_index + 1]);
+        out->b = values[color_index + 2] > 1.0f ? 1.0f : (values[color_index + 2] < 0.0f ? 0.0f : values[color_index + 2]);
         if (len == 8)
             out->z = values[2];
         if (len == 7) {
@@ -511,25 +515,6 @@ static bool py_color_unpack(int argc, py_StackRef argv)
     return true;
 }
 
-static bool py_init_renderer(int argc, py_StackRef argv)
-{
-    int w, h;
-    (void)argc;
-    if (!cast_int_arg(0, argv, &w) || !cast_int_arg(1, argv, &h))
-        return false;
-    py_newbool(py_retval(), grInit(w, h) != 0);
-    return true;
-}
-
-static bool py_shutdown_renderer(int argc, py_StackRef argv)
-{
-    (void)argc;
-    (void)argv;
-    grShutdown();
-    py_newnone(py_retval());
-    return true;
-}
-
 static bool py_buffer_clear(int argc, py_StackRef argv)
 {
     int color, alpha, depth;
@@ -602,6 +587,26 @@ static bool py_mouse_down(int argc, py_StackRef argv)
     return true;
 }
 
+static bool py_mouse_pressed(int argc, py_StackRef argv)
+{
+    int button = 0;
+    (void)argc;
+    if (!parse_mouse_button(py_arg(0), &button))
+        return TypeError("button must be an int or 'left'/'right'/'middle'");
+    py_newbool(py_retval(), g_host.mouse_pressed != NULL && g_host.mouse_pressed(g_host.userdata, button));
+    return true;
+}
+
+static bool py_mouse_released(int argc, py_StackRef argv)
+{
+    int button = 0;
+    (void)argc;
+    if (!parse_mouse_button(py_arg(0), &button))
+        return TypeError("button must be an int or 'left'/'right'/'middle'");
+    py_newbool(py_retval(), g_host.mouse_released != NULL && g_host.mouse_released(g_host.userdata, button));
+    return true;
+}
+
 static bool py_mouse_position(int argc, py_StackRef argv)
 {
     float x = 0.0f;
@@ -620,16 +625,12 @@ static bool py_mouse_position(int argc, py_StackRef argv)
 
 static bool py_screen_size(int argc, py_StackRef argv)
 {
-    int w = GR_FB_W;
-    int h = GR_FB_H;
     py_ObjectRef tuple;
     (void)argc;
     (void)argv;
-    if (g_host.framebuffer_size != NULL)
-        g_host.framebuffer_size(g_host.userdata, &w, &h);
     tuple = py_newtuple(py_retval(), 2);
-    py_newint(py_tuple_getitem(py_retval(), 0), w);
-    py_newint(py_tuple_getitem(py_retval(), 1), h);
+    py_newint(py_tuple_getitem(py_retval(), 0), GR_FB_W);
+    py_newint(py_tuple_getitem(py_retval(), 1), GR_FB_H);
     (void)tuple;
     return true;
 }
@@ -993,8 +994,6 @@ bool glBindingsRegister(py_Ref module)
 {
     py_bind(module, "color_pack(r, g, b, a)", py_color_pack);
     py_bind(module, "color_unpack(color)", py_color_unpack);
-    py_bind(module, "init_renderer(width, height)", py_init_renderer);
-    py_bind(module, "shutdown_renderer()", py_shutdown_renderer);
     py_bind(module, "buffer_clear(color, alpha, depth)", py_buffer_clear);
     py_bind(module, "buffer_swap_current()", py_buffer_swap_current);
     py_bind(module, "time()", py_time_now);
@@ -1002,6 +1001,8 @@ bool glBindingsRegister(py_Ref module)
     py_bind(module, "key_down(key)", py_key_down);
     py_bind(module, "key_pressed(key)", py_key_pressed);
     py_bind(module, "mouse_down(button)", py_mouse_down);
+    py_bind(module, "mouse_pressed(button)", py_mouse_pressed);
+    py_bind(module, "mouse_released(button)", py_mouse_released);
     py_bind(module, "mouse_position()", py_mouse_position);
     py_bind(module, "screen_size()", py_screen_size);
     py_bind(module, "set_title(title)", py_set_title);

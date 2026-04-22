@@ -547,13 +547,9 @@ static void draw_immediate(GLenum mode, const GrVertex *verts, int count)
 
     glUseProgram(g_gl.render_prog);
     glBindBuffer(GL_ARRAY_BUFFER, g_gl.batch_vbo);
-    glBufferData(GL_ARRAY_BUFFER,
-                 (GLsizeiptr)(sizeof(batch[0]) * (size_t)count),
-                 batch,
-                 GL_DYNAMIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glEnableVertexAttribArray(2);
+    glBufferSubData(GL_ARRAY_BUFFER, 0,
+                    (GLsizeiptr)(sizeof(batch[0]) * (size_t)count),
+                    batch);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, (GLsizei)sizeof(BatchVertex), (const void *)offsetof(BatchVertex, x));
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, (GLsizei)sizeof(BatchVertex), (const void *)offsetof(BatchVertex, r));
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, (GLsizei)sizeof(BatchVertex), (const void *)offsetof(BatchVertex, u));
@@ -581,13 +577,9 @@ static void batch_flush(void)
 
     glUseProgram(g_gl.render_prog);
     glBindBuffer(GL_ARRAY_BUFFER, g_gl.batch_vbo);
-    glBufferData(GL_ARRAY_BUFFER,
-                 (GLsizeiptr)(sizeof(g_gl.batch[0]) * (size_t)g_gl.batch_count),
-                 g_gl.batch,
-                 GL_DYNAMIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glEnableVertexAttribArray(2);
+    glBufferSubData(GL_ARRAY_BUFFER, 0,
+                    (GLsizeiptr)(sizeof(g_gl.batch[0]) * (size_t)g_gl.batch_count),
+                    g_gl.batch);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, (GLsizei)sizeof(BatchVertex), (const void *)offsetof(BatchVertex, x));
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, (GLsizei)sizeof(BatchVertex), (const void *)offsetof(BatchVertex, r));
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, (GLsizei)sizeof(BatchVertex), (const void *)offsetof(BatchVertex, u));
@@ -657,9 +649,7 @@ static void blit_to_default(int fb_w, int fb_h)
     glBindTexture(GL_TEXTURE_2D, g_gl.color_tex);
     glUniform1i(g_gl.blit_u_tex, 0);
     glBindBuffer(GL_ARRAY_BUFFER, g_gl.blit_vbo);
-    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)sizeof(verts), verts, GL_DYNAMIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)sizeof(verts), verts);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * (GLsizei)sizeof(GLfloat), (const void *)0);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * (GLsizei)sizeof(GLfloat), (const void *)(2 * sizeof(GLfloat)));
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -710,6 +700,16 @@ int grInit(int win_w, int win_h)
 
     glGenBuffers(1, &g_gl.batch_vbo);
     glGenBuffers(1, &g_gl.blit_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, g_gl.batch_vbo);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)sizeof(g_gl.batch), NULL, GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(2);
+    glBindBuffer(GL_ARRAY_BUFFER, g_gl.blit_vbo);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(sizeof(GLfloat) * 24), NULL, GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+
     glGenTextures(1, &g_gl.color_tex);
     glBindTexture(GL_TEXTURE_2D, g_gl.color_tex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, GR_FB_W, GR_FB_H, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
