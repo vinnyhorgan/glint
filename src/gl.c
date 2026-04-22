@@ -769,6 +769,8 @@ void grShutdown(void)
 void grBufferClear(GrColor_t color, GrAlpha_t alpha, GrDepth_t depth)
 {
     GrColor4f c;
+    GLboolean restore_depth_mask;
+
     batch_flush();
     grCoreUnpackColor(color, &c);
     c.a = grCoreByteToFloat(alpha);
@@ -778,14 +780,11 @@ void grBufferClear(GrColor_t color, GrAlpha_t alpha, GrDepth_t depth)
     set_scissor_rect();
     glClearColor(c.r, c.g, c.b, c.a);
     glClearDepthf((GLfloat)depth / 65535.0f);
-    if (g_gl.core.depth_mode != GR_DEPTHBUFFER_DISABLE) {
-        if (!g_gl.core.depth_mask)
-            glDepthMask(GL_TRUE);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glDepthMask(g_gl.core.depth_mask ? GL_TRUE : GL_FALSE);
-    } else {
-        glClear(GL_COLOR_BUFFER_BIT);
-    }
+    restore_depth_mask = g_gl.core.depth_mask ? GL_TRUE : GL_FALSE;
+    if (!g_gl.core.depth_mask)
+        glDepthMask(GL_TRUE);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glDepthMask(restore_depth_mask);
 }
 
 void grBufferSwap(struct GLFWwindow *window)

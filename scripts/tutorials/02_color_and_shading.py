@@ -28,11 +28,6 @@ import glide as g
 # color_pack(r,g,b,a) -> same as rgba (the C-level function)
 # color_unpack(c)   -> returns (r, g, b, a) tuple from a packed color
 #
-# For convenience, a helper that takes 0-255 values:
-def rgba255(r, g, b, a=255):
-    return (r / 255.0, g / 255.0, b / 255.0, a / 255.0)
-
-
 state = {"t": 0.0}
 
 
@@ -46,7 +41,7 @@ def update(dt):
 
 def draw():
     g.clear((0.02, 0.02, 0.06, 1.0))
-    g.set_untextured()
+    g.set_mode("gouraud")
 
     # =====================================================================
     # GOURAUD SHADED TRIANGLE
@@ -76,14 +71,15 @@ def draw():
     # Color can be a 3-tuple (r,g,b) or 4-tuple (r,g,b,a).
     # Under the hood it creates 4 vertices and draws 2 triangles.
 
-    # A row of colored squares
+    # A row of colored squares.
+    # Color tuples can be given directly in 0-255 form for convenience.
     colors = [
-        rgba255(255, 60, 80),    # red
-        rgba255(255, 160, 40),   # orange
-        rgba255(255, 240, 60),   # yellow
-        rgba255(60, 220, 100),   # green
-        rgba255(60, 160, 255),   # blue
-        rgba255(180, 80, 255),   # purple
+        (255, 60, 80),    # red
+        (255, 160, 40),   # orange
+        (255, 240, 60),   # yellow
+        (60, 220, 100),   # green
+        (60, 160, 255),   # blue
+        (180, 80, 255),   # purple
     ]
     for i, c in enumerate(colors):
         x = 28.0 + i * 46.0

@@ -182,11 +182,13 @@ def update(dt):
 
 def draw():
     g.clear((0.03, 0.03, 0.08, 1.0))
-    g.set_untextured()
+    g.set_mode("gouraud")
+    g.set_blend_alpha()
 
     # =====================================================================
     # CLICK RINGS (expanding circles at mouse click location)
     # =====================================================================
+    # Alpha blending is enabled above so these fades actually soften out.
     for x, y, age in state["click_rings"]:
         t = age / 0.8
         radius = 5.0 + t * 40.0

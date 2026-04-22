@@ -50,7 +50,7 @@ def update(dt):
 def draw():
     t = state["t"]
     g.clear((0.02, 0.02, 0.06, 1.0))
-    g.set_untextured()
+    g.set_mode("gouraud")
 
     # =====================================================================
     # SECTION 1: OPAQUE BACKGROUND SHAPES
@@ -99,7 +99,8 @@ def draw():
             (1.0, 0.2, 0.5, alpha),  # pink glow
             (0.1, 1.0, 0.4, alpha),  # green glow
         ][i]
-        # Draw multiple overlapping circles for a soft glow effect
+        # Draw multiple overlapping circles for a soft glow effect.
+        # line() only gets alpha if we pass full Vertex objects here.
         for layer in range(4):
             r = 8.0 + layer * 6.0
             a = color[3] * (1.0 - layer * 0.2)
@@ -108,10 +109,16 @@ def draw():
                 a0 = (j / segments) * math.pi * 2.0
                 a1 = ((j + 1) / segments) * math.pi * 2.0
                 g.line(
-                    (cx + math.cos(a0) * r, cy + math.sin(a0) * r,
-                     color[0], color[1], color[2]),
-                    (cx + math.cos(a1) * r, cy + math.sin(a1) * r,
-                     color[0], color[1], color[2]),
+                    g.vertex(
+                        cx + math.cos(a0) * r,
+                        cy + math.sin(a0) * r,
+                        color=(color[0], color[1], color[2], a),
+                    ),
+                    g.vertex(
+                        cx + math.cos(a1) * r,
+                        cy + math.sin(a1) * r,
+                        color=(color[0], color[1], color[2], a),
+                    ),
                 )
 
     # =====================================================================

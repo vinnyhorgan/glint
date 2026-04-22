@@ -47,7 +47,7 @@ def update(dt):
 #
 # The drawing pipeline is:
 #   1. Clear the framebuffer
-#   2. Set up render state (combine mode, blend mode, etc.)
+#   2. Set up render state (usually with a high-level mode helper)
 #   3. Issue draw calls (triangles, lines, points)
 #   4. The runtime calls swap() for you after draw() returns
 #      (you do NOT call g.swap() yourself — the main loop does it)
@@ -64,10 +64,10 @@ def draw():
     g.clear((0.05, 0.05, 0.12, 1.0))
 
     # -- Setting the render mode ----------------------------------------------
-    # set_untextured() tells the GPU we want to draw with vertex colors,
-    # not textures. This configures the "combine unit" (covered in
-    # tutorial 08) to pass vertex colors straight through.
-    g.set_untextured()
+    # set_mode("gouraud") is the standard "vertex colors, no texture" mode.
+    # Under the hood this selects the right combine state for untextured
+    # drawing. The lower-level combine functions are covered later.
+    g.set_mode("gouraud")
 
     # -- Creating vertices ----------------------------------------------------
     # A vertex is a point in screen space with optional color, depth, and
@@ -79,7 +79,7 @@ def draw():
     #
     # We'll make a white triangle centered on the screen.
     # The 5-tuple form is (x, y, r, g, b) — position plus color.
-    # Color values are 0.0-1.0 (values > 1.0 are treated as 0-255 range).
+    # Color values can be either 0.0-1.0 floats or 0-255 convenience values.
     #
     #        (160, 40)
     #           /\

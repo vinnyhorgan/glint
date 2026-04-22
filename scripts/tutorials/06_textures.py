@@ -224,7 +224,7 @@ def draw():
     # we need to draw manually with vertex() and triangle():
     g.tex_bind(state["tex1"])
 
-    # Draw a quad with fading alpha from left to right
+    # Draw a quad with fading alpha from top to bottom
     x0, y0 = 10.0, 175.0
     x1, y1 = 150.0, 230.0
     g.quad(
@@ -241,7 +241,7 @@ def draw():
     # With CLAMP, the edge pixel is stretched instead.
     #
     # Here we draw the same checkerboard with UVs from -0.5 to 1.5
-    # (showing 2x2 repeats). The top uses WRAP (default), the bottom
+    # (showing 2x2 repeats). The left uses WRAP (default), the right
     # uses CLAMP (no repetition, just edge stretching).
 
     g.set_mode("textured")

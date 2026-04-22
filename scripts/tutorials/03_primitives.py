@@ -101,7 +101,7 @@ def ring(cx, cy, inner_r, outer_r, color, segments=24):
 def draw():
     t = state["t"]
     g.clear((0.03, 0.03, 0.08, 1.0))
-    g.set_untextured()
+    g.set_mode("gouraud")
 
     # -- DIVIDER LINES --------------------------------------------------------
     # line() takes two vertices and draws a 1-pixel-wide line.
@@ -169,7 +169,7 @@ def draw():
 
     # -- CIRCLE (bottom-left, animated) ---------------------------------------
     r = 20.0 + math.sin(t * 2.5) * 6.0
-    circle(80.0, 215.0, r, (0.4, 0.5, 1.0, 1.0), 32)
+    circle(80.0, 211.0, r, (0.4, 0.5, 1.0, 1.0), 32)
 
     # -- ROTATING POLYGON (bottom-right) --------------------------------------
     angle_offset = t * 0.8
@@ -177,8 +177,8 @@ def draw():
     for i in range(10):
         a = (i / 10.0) * math.pi * 2.0 - math.pi / 2.0 + angle_offset
         r = 24.0 if i % 2 == 0 else 10.0
-        pts.append((240.0 + math.cos(a) * r, 215.0 + math.sin(a) * r))
+        pts.append((240.0 + math.cos(a) * r, 211.0 + math.sin(a) * r))
     poly(pts, (1.0, 0.9, 0.2))
 
     # -- RING (decorative outline) --------------------------------------------
-    ring(240.0, 215.0, 26.0, 29.0, (0.8, 0.7, 0.1), 32)
+    ring(240.0, 211.0, 26.0, 29.0, (0.8, 0.7, 0.1), 32)

@@ -564,30 +564,40 @@ int run_gl_bindings_tests(void)
     CHECK(nearf(g_last_triangle[2].a, 1.0f));
     CHECK(nearf(g_last_triangle[0].r, 0.5f));
 
-    /* Test Vertex color clamping: values outside 0-1 should be clamped */
+    /* Test Vertex color normalization: accepts 0-1 floats and 0-255 values. */
     if (!py_exec(
             "def _near(a, b, eps=1e-4):\n"
             "    return abs(a - b) < eps\n"
-            "v = glide.Vertex(1.0, 2.0, color=(1.5, -0.2, 0.5, 2.0))\n"
+            "v = glide.Vertex(1.0, 2.0, color=(255.0, -0.2, 128.0, 2.0))\n"
             "assert _near(v.r, 1.0), v.r\n"
             "assert _near(v.g, 0.0), v.g\n"
-            "assert _near(v.b, 0.5), v.b\n"
-            "assert _near(v.a, 1.0), v.a\n"
+            "assert _near(v.b, 128.0/255.0), v.b\n"
+            "assert _near(v.a, 2.0/255.0), v.a\n"
             "v2 = glide.Vertex(3.0, 4.0, color=(0.5, 0.25, 0.1, 0.75))\n"
             "assert _near(v2.r, 0.5), v2.r\n"
             "assert _near(v2.g, 0.25), v2.g\n"
             "assert _near(v2.b, 0.1), v2.b\n"
             "assert _near(v2.a, 0.75), v2.a\n"
             "glide.triangle(v, v2, glide.vertex(5.0, 6.0))\n",
-            "<vertex-color-clamp-test>", EXEC_MODE, main_mod)) {
+            "<vertex-color-normalization-test>", EXEC_MODE, main_mod)) {
         py_printexc();
         g_failures++;
     }
     CHECK(nearf(g_last_triangle[0].r, 1.0f));
     CHECK(nearf(g_last_triangle[0].g, 0.0f));
-    CHECK(nearf(g_last_triangle[0].b, 0.5f));
-    CHECK(nearf(g_last_triangle[0].a, 1.0f));
+    CHECK(nearf(g_last_triangle[0].b, 128.0f / 255.0f));
+    CHECK(nearf(g_last_triangle[0].a, 2.0f / 255.0f));
     CHECK(nearf(g_last_triangle[1].r, 0.5f));
+
+    if (!py_exec(
+            "glide.clear((255.0, 128.0, 64.0, 32.0))\n",
+            "<clear-255-colors>", EXEC_MODE, main_mod)) {
+        py_printexc();
+        g_failures++;
+    }
+    CHECK(g_last_clear_color == grColorPack(1.0f, 128.0f / 255.0f, 64.0f / 255.0f, 32.0f / 255.0f));
+    CHECK(g_last_clear_alpha == 32);
+    CHECK(g_last_clear_depth == 0xFFFF);
 
     /* Test new key name mappings */
     if (!py_exec(
