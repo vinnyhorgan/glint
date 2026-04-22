@@ -29,7 +29,7 @@ import math
 import glide as g
 
 
-state = {"t": 0.0, "tex0": -1, "tex1": -1, "tex2": -1}
+state = {"t": 0.0, "tex0": -1, "tex1": -1, "tex2": -1, "tex3": -1}
 
 
 # =============================================================================
@@ -102,6 +102,13 @@ def load():
     #   mipmap       — MIPMAP_DISABLE (default), MIPMAP_NEAREST
     #   s_clamp      — TEXTURECLAMP_WRAP (default) or TEXTURECLAMP_CLAMP
     #   t_clamp      — defaults to same as s_clamp
+    #
+    # Under the hood, upload_texture() calls the lower-level Glide API:
+    #   tex = tex_allocate()        # grab a free texture slot (max 8)
+    #   tex_download_mipmap(tex, ...) # upload pixel data
+    #   tex_filter(tex, ...)        # set filtering
+    #   tex_clamp_mode(tex, ...)    # set wrapping
+    # When you're done with a texture, call tex_free(tex) to release it.
 
     state["tex0"] = g.upload_texture(32, 32, make_checkerboard(32, 4))
 
@@ -113,6 +120,13 @@ def load():
 
     # Sprite sheet — 64x64 with 4x4 cells
     state["tex2"] = g.upload_texture(64, 64, make_sprite_sheet(64))
+
+    # Clamp texture — created once in load(), not every frame
+    state["tex3"] = g.upload_texture(
+        32, 32, make_checkerboard(32, 4),
+        s_clamp=g.TEXTURECLAMP_CLAMP,
+        t_clamp=g.TEXTURECLAMP_CLAMP,
+    )
 
 
 def update(dt):
@@ -242,12 +256,7 @@ def draw():
     )
 
     # CLAMP texture — edge pixels stretch, no tiling
-    tex_clamp = g.upload_texture(
-        32, 32, make_checkerboard(32, 4),
-        s_clamp=g.TEXTURECLAMP_CLAMP,
-        t_clamp=g.TEXTURECLAMP_CLAMP,
-    )
-    g.tex_bind(tex_clamp)
+    g.tex_bind(state["tex3"])
     g.quad(
         g.vertex(245.0, 165.0, u=-0.5, v=-0.5),
         g.vertex(315.0, 165.0, u=1.5,  v=-0.5),

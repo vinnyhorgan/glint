@@ -72,8 +72,6 @@ def draw():
     # PART 1: TABLE FOG — depth-based atmospheric fog
     # =====================================================================
     # Enable depth buffer for 3D mode, then turn on table fog.
-
-    g.begin_3d()
     g.fog_color_value(state["fog_color"])
 
     # Generate a fog table where fog starts at w=1.0 and becomes full at w=8.0

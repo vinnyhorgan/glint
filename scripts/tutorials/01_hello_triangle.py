@@ -58,6 +58,9 @@ def draw():
     # clear() takes an optional RGBA color tuple. Values are 0.0-1.0.
     # This fills the entire 320x240 framebuffer with the given color and
     # resets the depth buffer.
+    #
+    # clear() is a convenience wrapper around buffer_clear(). The raw API
+    # also provides buffer_clear(color, alpha, depth) for precise control.
     g.clear((0.05, 0.05, 0.12, 1.0))
 
     # -- Setting the render mode ----------------------------------------------

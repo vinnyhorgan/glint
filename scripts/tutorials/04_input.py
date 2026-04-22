@@ -4,7 +4,8 @@
 #
 # What you'll learn:
 #   - Keyboard input: key_down() (held) vs key_pressed() (single frame)
-#   - Mouse input: mouse_x(), mouse_y(), mouse_down()
+#   - Mouse input: mouse_x(), mouse_y(), mouse_down(), mouse_pressed(),
+#                  mouse_released()
 #   - Callbacks: keydown(key), keyup(key)
 #   - Quitting the app with quit()
 #   - Building an interactive demo
@@ -12,15 +13,17 @@
 # Glint provides two ways to read input:
 #
 #   Polling (check in update/draw):
-#     g.key_down(key)      — is the key currently held down?
-#     g.key_pressed(key)   — was the key just pressed this frame? (edge detect)
-#     g.mouse_down(button) — is the mouse button held down?
-#     g.mouse_x()          — mouse X in screen coordinates (0-319)
-#     g.mouse_y()          — mouse Y in screen coordinates (0-239)
+#     g.key_down(key)       — is the key currently held down?
+#     g.key_pressed(key)    — was the key just pressed this frame? (edge)
+#     g.mouse_down(button)  — is the mouse button held down?
+#     g.mouse_pressed(btn)  — was the mouse button just pressed this frame?
+#     g.mouse_released(btn) — was the mouse button just released this frame?
+#     g.mouse_x()           — mouse X in screen coordinates (0-319)
+#     g.mouse_y()           — mouse Y in screen coordinates (0-239)
 #
 #   Callbacks (define these in your script):
-#     keydown(key)         — called once when a key is pressed
-#     keyup(key)           — called once when a key is released
+#     keydown(key)          — called once when a key is pressed
+#     keyup(key)            — called once when a key is released
 #
 # Key names: 'a'-'z', '0'-'9', 'space', 'enter', 'escape', 'tab',
 #   'up', 'down', 'left', 'right', 'shift', 'ctrl', 'alt'
@@ -40,11 +43,13 @@ state = {
     "trail": [],           # list of (x, y, age) trail particles
     "color_cycle": 0.0,    # animated color
     "click_rings": [],     # visual rings at click position
+    "burst_particles": [], # particles spawned on mouse press
+    "held_color": (0.4, 0.7, 1.0),  # changes while mouse held
 }
 
 
 def load():
-    g.set_title("04 — Input (arrows = move, click = ring, space = color, esc = quit)")
+    g.set_title("04 — Input (arrows = move, click = burst, hold = rings, space = color, esc = quit)")
 
 
 # -- CALLBACKS ----------------------------------------------------------------
@@ -71,6 +76,10 @@ def update(dt):
     # =====================================================================
     # key_down(key) returns True while the key is held. Good for
     # continuous movement.
+    #
+    # For timing, you also have:
+    #   g.time()  — returns the current time in seconds (since startup)
+    #   g.dt()    — returns the delta time (same as the dt parameter above)
 
     dx = 0.0
     dy = 0.0
@@ -102,16 +111,45 @@ def update(dt):
     # mouse_x() and mouse_y() return screen-space pixel coordinates.
     # The fantasy screen is 320x240; the runtime scales mouse coords
     # from the window to the fantasy screen automatically.
+    #
+    # mouse_down()     — True every frame while the button is held.
+    # mouse_pressed()  — True for ONE frame when the button goes down.
+    # mouse_released() — True for ONE frame when the button goes up.
+    #
+    # Use mouse_pressed() for single-shot actions (fire weapon, place block).
+    # Use mouse_down() for continuous actions (spray paint, auto-fire).
+    # Use mouse_released() for charge-up releases or drag-drop.
+
+    mx = float(g.mouse_x())
+    my = float(g.mouse_y())
+
+    # -- Single-shot burst on press -----------------------------------------
+    if g.mouse_pressed("left"):
+        # Spawn a burst of 8 particles radiating outward
+        for i in range(8):
+            angle = (i / 8.0) * math.pi * 2.0
+            spd = 60.0
+            state["burst_particles"].append({
+                "x": mx, "y": my,
+                "vx": math.cos(angle) * spd,
+                "vy": math.sin(angle) * spd,
+                "age": 0.0,
+                "color": (1.0, 0.8, 0.2),
+            })
+
+    # -- Continuous rings while held ----------------------------------------
+    if g.mouse_down("left"):
+        state["click_rings"].append((mx, my, 0.0))
+
+    # -- Change cursor color while held -------------------------------------
+    if g.mouse_down("left"):
+        state["held_color"] = (1.0, 0.4, 0.3)
+    elif g.mouse_released("left"):
+        state["held_color"] = (0.4, 0.7, 1.0)
 
     # Add trail particles while moving
     if length > 0.0:
         state["trail"].append((state["px"], state["py"], 0.0))
-
-    # On mouse click, spawn an expanding ring at cursor position
-    if g.mouse_down("left"):
-        mx = float(g.mouse_x())
-        my = float(g.mouse_y())
-        state["click_rings"].append((mx, my, 0.0))
 
     # Update trail particles (age them and remove old ones)
     new_trail = []
@@ -128,6 +166,16 @@ def update(dt):
         if age < 0.8:
             new_rings.append((x, y, age))
     state["click_rings"] = new_rings
+
+    # Update burst particles
+    new_bursts = []
+    for p in state["burst_particles"]:
+        p["x"] += p["vx"] * dt
+        p["y"] += p["vy"] * dt
+        p["age"] += dt
+        if p["age"] < 0.5:
+            new_bursts.append(p)
+    state["burst_particles"] = new_bursts
 
 
 # -- DRAW ---------------------------------------------------------------------
@@ -185,18 +233,29 @@ def draw():
     )
 
     # =====================================================================
+    # BURST PARTICLES (spawned on mouse press)
+    # =====================================================================
+    for p in state["burst_particles"]:
+        t = p["age"] / 0.5
+        alpha = 1.0 - t
+        size = 3.0 * (1.0 - t)
+        c = (p["color"][0], p["color"][1], p["color"][2], alpha)
+        g.rect(p["x"] - size * 0.5, p["y"] - size * 0.5, size, size, c)
+
+    # =====================================================================
     # MOUSE CURSOR — small crosshair at mouse position
     # =====================================================================
     mx = float(g.mouse_x())
     my = float(g.mouse_y())
     cs = 4.0
+    hc = state["held_color"]
     g.line(
-        (mx - cs, my, 0.8, 0.8, 0.8),
-        (mx + cs, my, 0.8, 0.8, 0.8),
+        (mx - cs, my, hc[0], hc[1], hc[2]),
+        (mx + cs, my, hc[0], hc[1], hc[2]),
     )
     g.line(
-        (mx, my - cs, 0.8, 0.8, 0.8),
-        (mx, my + cs, 0.8, 0.8, 0.8),
+        (mx, my - cs, hc[0], hc[1], hc[2]),
+        (mx, my + cs, hc[0], hc[1], hc[2]),
     )
 
     # =====================================================================

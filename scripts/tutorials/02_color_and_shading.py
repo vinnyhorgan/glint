@@ -110,6 +110,38 @@ def draw():
         g.rect(x, 174.0 + y_offset, 30.0, 14.0)
 
     # =====================================================================
+    # HARDWARE FLAT SHADING — shade_model()
+    # =====================================================================
+    # set_mode('flat') uses a CONSTANT color register (same color everywhere).
+    # shade_model(SHADE_FLAT) is different: it tells the GPU to copy the
+    # FIRST vertex's color to ALL vertices in the primitive. The triangle
+    # still has 3 different colors in memory, but the GPU flattens them
+    # before rasterizing.
+    #
+    # This is classic "flat shading" — each triangle is a single solid
+    # color taken from its first vertex. It looks very different from
+    # Gouraud shading where colors are smoothly interpolated.
+
+    g.set_mode("gouraud")
+    g.shade_model(g.SHADE_FLAT)
+
+    # Both triangles use the first vertex color for the whole face.
+    # The second and third vertex colors are IGNORED by the rasterizer.
+    g.triangle(
+        (40.0,  160.0, 1.0, 0.2, 0.3),   # first vertex = red/pink (used)
+        (100.0, 160.0, 0.2, 1.0, 0.3),   # green (ignored)
+        (70.0,  190.0, 0.2, 0.3, 1.0),   # blue (ignored)
+    )
+    g.triangle(
+        (120.0, 160.0, 0.2, 1.0, 0.3),   # first vertex = green (used)
+        (180.0, 160.0, 1.0, 0.2, 0.3),   # red (ignored)
+        (150.0, 190.0, 0.2, 0.3, 1.0),   # blue (ignored)
+    )
+
+    # Restore gouraud shading for the rest of the frame
+    g.shade_model(g.SHADE_GOURAUD)
+
+    # =====================================================================
     # ANIMATED GOURAUD QUAD
     # =====================================================================
     # Switch back to gouraud mode for per-vertex color.

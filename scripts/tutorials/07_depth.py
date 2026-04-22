@@ -203,7 +203,62 @@ def draw():
         )
 
     # =====================================================================
-    # PART 4: 2D OVERLAY on top of 3D scene
+    # PART 4: DEPTH BUFFER FUNCTION & DEPTH MASK
+    # =====================================================================
+    # depth_buffer_function() changes the comparison used for depth testing.
+    # Default is CMP_LESS (closer pixels win). Here we use CMP_GREATER
+    # so that ONLY pixels farther than existing depth are drawn.
+    #
+    # depth_mask(False) disables writing to the depth buffer. This is
+    # useful for "see-through" overlays like wireframes or holograms
+    # that you want to render on top without affecting future draws.
+
+    # Draw a wireframe outline of the cube that only appears BEHIND
+    # existing geometry (because CMP_GREATER passes for farther z)
+    g.depth_buffer_function(g.CMP_GREATER)
+    for entry in face_depths:
+        avg_z = entry[0]
+        indices = entry[1]
+        color = entry[2]
+        skip = False
+        for i in indices:
+            if projected[i] is None:
+                skip = True
+                break
+        if skip:
+            continue
+        pts = []
+        for i in indices:
+            pts.append(projected[i])
+        z = avg_z * 0.15
+        z = max(0.0, min(1.0, z))
+        # Draw edges as white lines
+        for i in range(4):
+            j = (i + 1) % 4
+            g.line(
+                g.vertex(pts[i][0], pts[i][1], z=z, color=(1.0, 1.0, 1.0, 0.4)),
+                g.vertex(pts[j][0], pts[j][1], z=z, color=(1.0, 1.0, 1.0, 0.4)),
+            )
+
+    # Restore default depth comparison
+    g.depth_buffer_function(g.CMP_LESS)
+
+    # Now draw a "hologram" grid that doesn't write depth — it will
+    # clip against existing depth but won't affect later draws.
+    g.depth_mask(False)
+    g.set_blend_alpha()
+    for i in range(6):
+        y = 80.0 + i * 15.0
+        z = 0.3 + i * 0.1
+        g.line(
+            g.vertex(10.0, y, z=z, color=(0.3, 0.8, 0.5, 0.3)),
+            g.vertex(310.0, y, z=z, color=(0.3, 0.8, 0.5, 0.3)),
+        )
+    g.depth_mask(True)
+    g.set_blend_none()
+
+    # =====================================================================
+    # PART 5: 2D OVERLAY on top of 3D scene
     # =====================================================================
     # Switch back to 2D mode to draw HUD elements on top.
     # begin_2d() disables depth testing so overlays always appear on top.

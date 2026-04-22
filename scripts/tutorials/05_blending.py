@@ -164,7 +164,42 @@ def draw():
             )
 
     # =====================================================================
-    # SECTION 6: ADDITIVE GLOW OVERLAY
+    # SECTION 6: CUSTOM BLEND FUNCTIONS
+    # =====================================================================
+    # The three set_blend_*() helpers are just presets. You can build
+    # your own effects with alpha_blend_function() using the 11 blend
+    # factors. Here are two useful custom modes:
+    #
+    # MULTIPLY (shadow / darken):
+    #   src_factor = BLEND_DST_COLOR  → multiply source by framebuffer
+    #   dst_factor = BLEND_ZERO       → ignore destination
+    #   result = src_color * dst_color
+    #   White source = no change. Black source = black. Gray = darker.
+    #
+    # SCREEN (highlight / lighten):
+    #   src_factor = BLEND_ONE
+    #   dst_factor = BLEND_ONE_MINUS_SRC_COLOR
+    #   result = src + dst * (1 - src_color)
+    #   Black source = no change. White source = white. Gray = lighter.
+
+    # -- Multiply shadow demo --
+    g.alpha_blend_function(
+        g.BLEND_DST_COLOR, g.BLEND_ZERO,
+        g.BLEND_ONE, g.BLEND_ZERO,
+    )
+    # A dark blue overlay that deepens whatever is beneath it
+    g.rect(200.0, 95.0, 100.0, 40.0, (0.4, 0.4, 0.7, 1.0))
+
+    # -- Screen highlight demo --
+    g.alpha_blend_function(
+        g.BLEND_ONE, g.BLEND_ONE_MINUS_SRC_COLOR,
+        g.BLEND_ONE, g.BLEND_ZERO,
+    )
+    # A bright yellow overlay that lightens whatever is beneath it
+    g.rect(215.0, 105.0, 70.0, 20.0, (0.6, 0.6, 0.2, 1.0))
+
+    # =====================================================================
+    # SECTION 7: ADDITIVE GLOW OVERLAY
     # =====================================================================
     # A bright additive glow at the bottom ties the scene together.
 
