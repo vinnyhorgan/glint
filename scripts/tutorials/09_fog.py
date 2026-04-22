@@ -64,6 +64,7 @@ def update(dt):
 
 def draw():
     t = state["t"]
+    g.begin_3d()
     g.clear((0.04, 0.04, 0.10, 1.0))
     g.set_untextured()
 

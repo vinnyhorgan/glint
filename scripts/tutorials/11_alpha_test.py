@@ -153,7 +153,9 @@ def draw():
     g.set_blend_none()
     g.alpha_test_reference_value(128)
 
-    for i, (func, label) in enumerate(funcs):
+    for i in range(len(funcs)):
+        func = funcs[i][0]
+        label = funcs[i][1]
         y_base = 4.0 + i * 3.0
         g.alpha_test_function(func)
         # Draw a thin bar with alpha gradient from 0 (left) to 255 (right)

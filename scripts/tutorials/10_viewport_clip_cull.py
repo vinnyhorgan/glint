@@ -172,7 +172,8 @@ def draw():
         (g.CULL_POSITIVE, "cull CCW"),
     ]
 
-    for mi, (mode, _) in enumerate(modes):
+    for mi in range(len(modes)):
+        mode = modes[mi][0]
         cx = 40.0 + mi * 120.0
         cy = 220.0
         g.cull_mode(mode)

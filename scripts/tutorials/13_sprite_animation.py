@@ -85,9 +85,9 @@ def make_sprite_sheet(size=64):
                 dy = ly - cell // 2
                 d = math.sqrt(dx * dx + dy * dy)
                 if d < cell // 3:
-                    r = int(200 + 30 * cx)
-                    gr = int(160 + 20 * cx)
-                    b = int(80 + 15 * cx)
+                    r = min(255, int(200 + 30 * cx))
+                    gr = min(255, int(160 + 20 * cx))
+                    b = min(255, int(80 + 15 * cx))
                     pixels.extend([255, r, gr, b])
                 else:
                     pixels.extend([0, 0, 0, 0])
@@ -263,7 +263,9 @@ def draw():
     g.set_blend_alpha()
 
     strip_y = 210.0
-    for row, (name, cfg) in enumerate(ANIM_CONFIG.items()):
+    row = 0
+    for name in ANIM_CONFIG:
+        cfg = ANIM_CONFIG[name]
         for frame in range(cfg["frames"]):
             cell_uv = 1.0 / 4.0
             fu0 = frame * cell_uv
@@ -274,3 +276,4 @@ def draw():
             y = strip_y + row * 18.0
             g.image(state["sheet"], x, y, 16.0, 16.0,
                     u0=fu0, v0=fv0, u1=fu1, v1=fv1)
+        row += 1

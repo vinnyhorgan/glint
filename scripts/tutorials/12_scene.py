@@ -67,7 +67,7 @@ def make_wall_texture(size=32):
                 pixels.extend([255, 40, 35, 35])
             else:
                 base = 80 + ((row * 7 + col * 13) % 40)
-                pixels.extend([255, base, base * 0.6, base * 0.4])
+                pixels.extend([255, int(base), int(base * 0.6), int(base * 0.4)])
     return pixels
 
 

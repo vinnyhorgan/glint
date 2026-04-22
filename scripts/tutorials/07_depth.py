@@ -161,15 +161,37 @@ def draw():
     # This works together with the depth buffer for correct overlap.
     face_depths = []
     for indices, color in faces:
-        avg_z = sum(projected[i][2] for i in indices if projected[i] is not None) / 4.0
+        total = 0.0
+        for i in indices:
+            if projected[i] is not None:
+                total += projected[i][2]
+        avg_z = total / 4.0
         face_depths.append((avg_z, indices, color))
-    face_depths.sort(key=lambda f: -f[0])  # far to near
+
+    # Bubble sort by avg_z descending (far to near)
+    n = len(face_depths)
+    for i in range(n):
+        for j in range(0, n - i - 1):
+            if face_depths[j][0] < face_depths[j + 1][0]:
+                tmp = face_depths[j]
+                face_depths[j] = face_depths[j + 1]
+                face_depths[j + 1] = tmp
 
     # Draw each face as two triangles
-    for avg_z, indices, color in face_depths:
-        if any(projected[i] is None for i in indices):
+    for entry in face_depths:
+        avg_z = entry[0]
+        indices = entry[1]
+        color = entry[2]
+        skip = False
+        for i in indices:
+            if projected[i] is None:
+                skip = True
+                break
+        if skip:
             continue
-        pts = [projected[i] for i in indices]
+        pts = []
+        for i in indices:
+            pts.append(projected[i])
         z = avg_z * 0.15  # normalize z to 0-1 range for depth buffer
         z = max(0.0, min(1.0, z))
         c = (color[0], color[1], color[2], 1.0)
