@@ -189,6 +189,8 @@ def draw():
     # CLICK RINGS (expanding circles at mouse click location)
     # =====================================================================
     # Alpha blending is enabled above so these fades actually soften out.
+    # We use g.vertex() here because the 5-tuple format has no alpha
+    # channel — only Vertex objects can carry per-vertex alpha.
     for x, y, age in state["click_rings"]:
         t = age / 0.8
         radius = 5.0 + t * 40.0
@@ -201,8 +203,8 @@ def draw():
             a0 = (i / segments) * math.pi * 2.0
             a1 = ((i + 1) / segments) * math.pi * 2.0
             g.line(
-                (x + math.cos(a0) * radius, y + math.sin(a0) * radius, c[0], c[1], c[2]),
-                (x + math.cos(a1) * radius, y + math.sin(a1) * radius, c[0], c[1], c[2]),
+                g.vertex(x + math.cos(a0) * radius, y + math.sin(a0) * radius, color=c),
+                g.vertex(x + math.cos(a1) * radius, y + math.sin(a1) * radius, color=c),
             )
 
     # =====================================================================
