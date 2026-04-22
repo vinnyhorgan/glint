@@ -221,6 +221,28 @@ void grFogMode(GrFogMode_t mode) { (void)mode; }
 void grFogColorValue(GrColor_t color) { (void)color; }
 void grFogTable(const GrFog_t table[GR_FOG_TABLE_SIZE]) { (void)table; }
 
+static int g_mock_stack_tex[GR_MAX_STATE_STACK];
+static GrDepthBufferMode_t g_mock_stack_depth_mode[GR_MAX_STATE_STACK];
+static int g_mock_stack_idx = 0;
+
+void grPushState(void)
+{
+    if (g_mock_stack_idx >= GR_MAX_STATE_STACK)
+        return;
+    g_mock_stack_tex[g_mock_stack_idx] = g_last_bound_tex;
+    g_mock_stack_depth_mode[g_mock_stack_idx] = g_last_depth_mode;
+    g_mock_stack_idx++;
+}
+
+void grPopState(void)
+{
+    if (g_mock_stack_idx <= 0)
+        return;
+    g_mock_stack_idx--;
+    g_last_bound_tex = g_mock_stack_tex[g_mock_stack_idx];
+    g_last_depth_mode = g_mock_stack_depth_mode[g_mock_stack_idx];
+}
+
 int grTexAllocate(void)
 {
     return g_next_tex++;
@@ -600,6 +622,21 @@ int run_gl_bindings_tests(void)
         py_printexc();
         g_failures++;
     }
+
+    /* Test push_state / pop_state */
+    g_last_bound_tex = 42;
+    g_last_depth_mode = GR_DEPTHBUFFER_ZBUFFER;
+    if (!py_exec(
+            "glide.push_state()\n"
+            "glide.tex_bind(7)\n"
+            "glide.depth_buffer_mode(glide.DEPTHBUFFER_DISABLE)\n"
+            "glide.pop_state()\n",
+            "<push-pop-test>", EXEC_MODE, main_mod)) {
+        py_printexc();
+        g_failures++;
+    }
+    CHECK(g_last_bound_tex == 42);
+    CHECK(g_last_depth_mode == GR_DEPTHBUFFER_ZBUFFER);
 
     glBindingsSetHost(NULL);
     py_finalize();

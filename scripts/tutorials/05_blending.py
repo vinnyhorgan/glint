@@ -181,6 +181,12 @@ def draw():
     #   dst_factor = BLEND_ONE_MINUS_SRC_COLOR
     #   result = src + dst * (1 - src_color)
     #   Black source = no change. White source = white. Gray = lighter.
+    #
+    # We wrap this section in push_state() / pop_state() so the custom
+    # blend settings are automatically restored afterward. This keeps
+    # each section self-contained and prevents state leaks.
+
+    g.push_state()
 
     # -- Multiply shadow demo --
     g.alpha_blend_function(
@@ -198,14 +204,18 @@ def draw():
     # A bright yellow overlay that lightens whatever is beneath it
     g.rect(215.0, 105.0, 70.0, 20.0, (0.6, 0.6, 0.2, 1.0))
 
+    g.pop_state()
+
     # =====================================================================
     # SECTION 7: ADDITIVE GLOW OVERLAY
     # =====================================================================
     # A bright additive glow at the bottom ties the scene together.
+    # Because Section 6 used push_state/pop_state, we're back to the
+    # alpha blending mode from Section 5 here. We switch to additive
+    # just for this glow, then pop it back.
 
+    g.push_state()
     g.set_blend_add()
     glow_alpha = 0.15 + 0.05 * math.sin(t * 2.0)
     g.rect(0.0, 225.0, 320.0, 15.0, (0.3, 0.1, 0.5, glow_alpha))
-
-    # Reset to no blending for safety
-    g.set_blend_none()
+    g.pop_state()

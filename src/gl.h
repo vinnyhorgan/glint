@@ -15,6 +15,7 @@ struct GLFWwindow;
 #define GR_MAX_TEXTURES 8
 #define GR_MAX_TEX_SIZE 256
 #define GR_FOG_TABLE_SIZE 64
+#define GR_MAX_STATE_STACK 8
 
 typedef uint8_t GrAlpha_t;
 typedef uint8_t GrFog_t;
@@ -182,6 +183,9 @@ void grShadeModel(GrShadeModel_t mode);
 void grFogMode(GrFogMode_t mode);
 void grFogColorValue(GrColor_t color);
 void grFogTable(const GrFog_t table[GR_FOG_TABLE_SIZE]);
+
+void grPushState(void);
+void grPopState(void);
 
 int  grTexAllocate(void);
 void grTexFree(int tex);

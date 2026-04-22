@@ -307,12 +307,13 @@ def draw():
     g.rect(map_x, map_y, map_w, map_h, (0.1, 0.1, 0.15))
 
     # Camera rect on minimap (semi-transparent)
+    g.push_state()
     g.set_blend_alpha()
     cam_rel_x = (state["cam_x"] - g.FB_W / 2.0 / state["zoom"]) / WORLD_W
     cam_rel_w = (g.FB_W / state["zoom"]) / WORLD_W
     g.rect(map_x + cam_rel_x * map_w, map_y + 2.0,
            cam_rel_w * map_w, map_h - 4.0, (0.5, 0.7, 1.0, 0.5))
-    g.set_blend_none()
+    g.pop_state()
 
     # Player dot on minimap
     player_mx = map_x + (state["player_x"] / WORLD_W) * map_w

@@ -212,9 +212,13 @@ def draw():
     # depth_mask(False) disables writing to the depth buffer. This is
     # useful for "see-through" overlays like wireframes or holograms
     # that you want to render on top without affecting future draws.
+    #
+    # We use push_state() / pop_state() to isolate these changes so we
+    # don't have to manually remember and restore every setting.
 
     # Draw a wireframe outline of the cube that only appears BEHIND
     # existing geometry (because CMP_GREATER passes for farther z)
+    g.push_state()
     g.depth_buffer_function(g.CMP_GREATER)
     for entry in face_depths:
         avg_z = entry[0]
@@ -239,12 +243,11 @@ def draw():
                 g.vertex(pts[i][0], pts[i][1], z=z, color=(1.0, 1.0, 1.0, 0.4)),
                 g.vertex(pts[j][0], pts[j][1], z=z, color=(1.0, 1.0, 1.0, 0.4)),
             )
-
-    # Restore default depth comparison
-    g.depth_buffer_function(g.CMP_LESS)
+    g.pop_state()
 
     # Now draw a "hologram" grid that doesn't write depth — it will
     # clip against existing depth but won't affect later draws.
+    g.push_state()
     g.depth_mask(False)
     g.set_blend_alpha()
     for i in range(6):
@@ -254,8 +257,7 @@ def draw():
             g.vertex(10.0, y, z=z, color=(0.3, 0.8, 0.5, 0.3)),
             g.vertex(310.0, y, z=z, color=(0.3, 0.8, 0.5, 0.3)),
         )
-    g.depth_mask(True)
-    g.set_blend_none()
+    g.pop_state()
 
     # =====================================================================
     # PART 5: 2D OVERLAY on top of 3D scene

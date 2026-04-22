@@ -82,6 +82,13 @@ typedef struct {
     int win_h;
     GrStateCore core;
     bool ready;
+    GrStateCore stack_core[GR_MAX_STATE_STACK];
+    int stack_bound_tex[GR_MAX_STATE_STACK];
+    int stack_viewport_x[GR_MAX_STATE_STACK];
+    int stack_viewport_y[GR_MAX_STATE_STACK];
+    int stack_viewport_w[GR_MAX_STATE_STACK];
+    int stack_viewport_h[GR_MAX_STATE_STACK];
+    int stack_depth;
 } GlState;
 
 static GlState g_gl;
@@ -920,6 +927,36 @@ void grFogTable(const GrFog_t table[GR_FOG_TABLE_SIZE])
 {
     batch_flush();
     memcpy(g_gl.core.fog_table, table, sizeof(g_gl.core.fog_table));
+}
+
+void grPushState(void)
+{
+    int d = g_gl.stack_depth;
+    if (d >= GR_MAX_STATE_STACK)
+        return;
+    g_gl.stack_core[d] = g_gl.core;
+    g_gl.stack_bound_tex[d] = g_gl.bound_tex;
+    g_gl.stack_viewport_x[d] = g_gl.viewport_x;
+    g_gl.stack_viewport_y[d] = g_gl.viewport_y;
+    g_gl.stack_viewport_w[d] = g_gl.viewport_w;
+    g_gl.stack_viewport_h[d] = g_gl.viewport_h;
+    g_gl.stack_depth = d + 1;
+}
+
+void grPopState(void)
+{
+    int d = g_gl.stack_depth;
+    if (d <= 0)
+        return;
+    d--;
+    batch_flush();
+    g_gl.core = g_gl.stack_core[d];
+    g_gl.bound_tex = g_gl.stack_bound_tex[d];
+    g_gl.viewport_x = g_gl.stack_viewport_x[d];
+    g_gl.viewport_y = g_gl.stack_viewport_y[d];
+    g_gl.viewport_w = g_gl.stack_viewport_w[d];
+    g_gl.viewport_h = g_gl.stack_viewport_h[d];
+    g_gl.stack_depth = d;
 }
 
 int grTexAllocate(void)

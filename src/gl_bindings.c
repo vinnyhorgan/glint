@@ -218,7 +218,13 @@ static const char *kBindingsBootstrap[] = {
     "    return int(mouse_position()[0])\n"
     "\n"
     "def mouse_y():\n"
-    "    return int(mouse_position()[1])\n",
+    "    return int(mouse_position()[1])\n"
+    "\n"
+    "def push_state():\n"
+    "    _push_state()\n"
+    "\n"
+    "def pop_state():\n"
+    "    _pop_state()\n",
 };
 
 static bool exec_bootstrap(py_Ref module)
@@ -990,6 +996,24 @@ static bool py_draw_line(int argc, py_StackRef argv)
     return true;
 }
 
+static bool py_push_state(int argc, py_StackRef argv)
+{
+    (void)argc;
+    (void)argv;
+    grPushState();
+    py_newnone(py_retval());
+    return true;
+}
+
+static bool py_pop_state(int argc, py_StackRef argv)
+{
+    (void)argc;
+    (void)argv;
+    grPopState();
+    py_newnone(py_retval());
+    return true;
+}
+
 bool glBindingsRegister(py_Ref module)
 {
     py_bind(module, "color_pack(r, g, b, a)", py_color_pack);
@@ -1032,6 +1056,8 @@ bool glBindingsRegister(py_Ref module)
     py_bind(module, "draw_triangle(v0, v1, v2)", py_draw_triangle);
     py_bind(module, "draw_point(v)", py_draw_point);
     py_bind(module, "draw_line(v0, v1)", py_draw_line);
+    py_bind(module, "_push_state()", py_push_state);
+    py_bind(module, "_pop_state()", py_pop_state);
 
     set_module_int(module, "FB_W", GR_FB_W);
     set_module_int(module, "FB_H", GR_FB_H);
