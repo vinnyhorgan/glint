@@ -99,25 +99,27 @@ def draw():
             (1.0, 0.2, 0.5, alpha),  # pink glow
             (0.1, 1.0, 0.4, alpha),  # green glow
         ][i]
-        # Draw multiple overlapping circles for a soft glow effect.
-        # line() only gets alpha if we pass full Vertex objects here.
+        # Draw multiple overlapping filled circles for a soft glow effect.
+        # Each circle is a triangle fan centered on (cx, cy).
         for layer in range(4):
             r = 8.0 + layer * 6.0
             a = color[3] * (1.0 - layer * 0.2)
+            c = (color[0], color[1], color[2], a)
             segments = 20
             for j in range(segments):
                 a0 = (j / segments) * math.pi * 2.0
                 a1 = ((j + 1) / segments) * math.pi * 2.0
-                g.line(
+                g.triangle(
+                    g.vertex(cx, cy, color=c),
                     g.vertex(
                         cx + math.cos(a0) * r,
                         cy + math.sin(a0) * r,
-                        color=(color[0], color[1], color[2], a),
+                        color=c,
                     ),
                     g.vertex(
                         cx + math.cos(a1) * r,
                         cy + math.sin(a1) * r,
-                        color=(color[0], color[1], color[2], a),
+                        color=c,
                     ),
                 )
 

@@ -151,31 +151,33 @@ def update(dt):
     if length > 0.0:
         state["trail"].append((state["px"], state["py"], 0.0))
 
-    # Update trail particles (age them and remove old ones)
-    new_trail = []
-    for x, y, age in state["trail"]:
+    # Update trail particles in-place to avoid per-frame allocations
+    # (good practice on a memory-constrained machine).
+    for i in range(len(state["trail"]) - 1, -1, -1):
+        x, y, age = state["trail"][i]
         age += dt
-        if age < 1.0:
-            new_trail.append((x, y, age))
-    state["trail"] = new_trail
+        if age >= 1.0:
+            state["trail"].pop(i)
+        else:
+            state["trail"][i] = (x, y, age)
 
-    # Update click rings
-    new_rings = []
-    for x, y, age in state["click_rings"]:
+    # Update click rings in-place
+    for i in range(len(state["click_rings"]) - 1, -1, -1):
+        x, y, age = state["click_rings"][i]
         age += dt
-        if age < 0.8:
-            new_rings.append((x, y, age))
-    state["click_rings"] = new_rings
+        if age >= 0.8:
+            state["click_rings"].pop(i)
+        else:
+            state["click_rings"][i] = (x, y, age)
 
-    # Update burst particles
-    new_bursts = []
-    for p in state["burst_particles"]:
+    # Update burst particles in-place
+    for i in range(len(state["burst_particles"]) - 1, -1, -1):
+        p = state["burst_particles"][i]
         p["x"] += p["vx"] * dt
         p["y"] += p["vy"] * dt
         p["age"] += dt
-        if p["age"] < 0.5:
-            new_bursts.append(p)
-    state["burst_particles"] = new_bursts
+        if p["age"] >= 0.5:
+            state["burst_particles"].pop(i)
 
 
 # -- DRAW ---------------------------------------------------------------------
@@ -183,12 +185,13 @@ def update(dt):
 def draw():
     g.clear((0.03, 0.03, 0.08, 1.0))
     g.set_mode("gouraud")
-    g.set_blend_alpha()
 
     # =====================================================================
-    # CLICK RINGS (expanding circles at mouse click location)
+    # TRANSPARENT EFFECTS (drawn first, behind the player)
     # =====================================================================
-    # Alpha blending is enabled above so these fades actually soften out.
+    g.set_blend_alpha()
+
+    # -- Click rings (expanding circles at mouse click location) -------------
     # We use g.vertex() here because the 5-tuple format has no alpha
     # channel — only Vertex objects can carry per-vertex alpha.
     for x, y, age in state["click_rings"]:
@@ -207,9 +210,7 @@ def draw():
                 g.vertex(x + math.cos(a1) * radius, y + math.sin(a1) * radius, color=c),
             )
 
-    # =====================================================================
-    # TRAIL PARTICLES
-    # =====================================================================
+    # -- Trail particles -----------------------------------------------------
     for x, y, age in state["trail"]:
         alpha = 1.0 - age
         size = 3.0 * alpha
@@ -217,8 +218,10 @@ def draw():
         g.rect(x - size * 0.5, y - size * 0.5, size, size, c)
 
     # =====================================================================
-    # PLAYER CURSOR — animated triangle that follows arrow keys
+    # OPAQUE PLAYER CURSOR
     # =====================================================================
+    g.set_blend_none()
+
     t = state["color_cycle"]
     cr = 0.5 + 0.5 * math.sin(t)
     cg = 0.5 + 0.5 * math.sin(t + 2.1)
@@ -237,8 +240,11 @@ def draw():
     )
 
     # =====================================================================
-    # BURST PARTICLES (spawned on mouse press)
+    # TRANSPARENT EFFECTS ON TOP OF PLAYER
     # =====================================================================
+    g.set_blend_alpha()
+
+    # -- Burst particles (spawned on mouse press) ----------------------------
     for p in state["burst_particles"]:
         t = p["age"] / 0.5
         alpha = 1.0 - t
@@ -247,8 +253,11 @@ def draw():
         g.rect(p["x"] - size * 0.5, p["y"] - size * 0.5, size, size, c)
 
     # =====================================================================
-    # MOUSE CURSOR — small crosshair at mouse position
+    # OPAQUE UI OVERLAY
     # =====================================================================
+    g.set_blend_none()
+
+    # -- Mouse cursor — small crosshair at mouse position --------------------
     mx = float(g.mouse_x())
     my = float(g.mouse_y())
     cs = 4.0

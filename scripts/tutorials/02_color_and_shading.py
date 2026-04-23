@@ -98,8 +98,9 @@ def draw():
     g.set_mode("flat")
     g.constant_color_value(g.rgba(0.9, 0.7, 0.1, 1.0))
 
-    # These rectangles will all be the same golden color, even though
-    # we don't specify color on the vertices:
+    # These rectangles will all be the same golden color.
+    # set_mode('flat') ignores per-vertex color and uses the constant
+    # color register instead, so every pixel is identical:
     for i in range(8):
         x = 20.0 + i * 37.0
         y_offset = math.sin(state["t"] * 2.0 + i * 0.8) * 8.0

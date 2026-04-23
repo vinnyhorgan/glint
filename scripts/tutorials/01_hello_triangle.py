@@ -22,7 +22,10 @@
 #
 # =============================================================================
 
+import math
 import glide as g
+
+state = {"t": 0.0}
 
 
 # -- load() -------------------------------------------------------------------
@@ -39,7 +42,7 @@ def load():
 # We don't need any logic for this simple example.
 # -----------------------------------------------------------------------------
 def update(dt):
-    pass
+    state["t"] += dt
 
 
 # -- draw() -------------------------------------------------------------------
@@ -50,18 +53,20 @@ def update(dt):
 #   2. Set up render state (usually with a high-level mode helper)
 #   3. Issue draw calls (triangles, lines, points)
 #   4. The runtime calls swap() for you after draw() returns
-#      (you do NOT call g.swap() yourself — the main loop does it)
+#      (you don't need to call g.swap() yourself — the main loop does it)
 # -----------------------------------------------------------------------------
 def draw():
+    t = state["t"]
 
     # -- Clearing the screen --------------------------------------------------
-    # clear() takes an optional RGBA color tuple. Values are 0.0-1.0.
-    # This fills the entire 320x240 framebuffer with the given color and
-    # resets the depth buffer.
+    # clear() takes an optional RGBA color tuple. Values are 0.0-1.0
+    # (or 0-255 integers for convenience). This fills the entire 320x240
+    # framebuffer with the given color and resets the depth buffer.
     #
     # clear() is a convenience wrapper around buffer_clear(). The raw API
     # also provides buffer_clear(color, alpha, depth) for precise control.
-    g.clear((0.05, 0.05, 0.12, 1.0))
+    b = 0.12 + 0.03 * math.sin(t * 0.5)
+    g.clear((0.05, 0.05, b, 1.0))
 
     # -- Setting the render mode ----------------------------------------------
     # set_mode("gouraud") is the standard "vertex colors, no texture" mode.
@@ -88,9 +93,11 @@ def draw():
     #        /______\
     #   (60,200)  (260,200)
     #
-    v0 = (160.0, 40.0,  1.0, 1.0, 1.0)  # top — white
-    v1 = (60.0,  200.0, 1.0, 1.0, 1.0)  # bottom-left — white
-    v2 = (260.0, 200.0, 1.0, 1.0, 1.0)  # bottom-right — white
+    # The triangle gently pulses to show update() and draw() working together.
+    pulse = 0.85 + 0.15 * math.sin(t * 2.0)
+    v0 = (160.0, 40.0,  pulse, pulse, pulse)  # top
+    v1 = (60.0,  200.0, pulse, pulse, pulse)  # bottom-left
+    v2 = (260.0, 200.0, pulse, pulse, pulse)  # bottom-right
 
     # -- Drawing a triangle ---------------------------------------------------
     # triangle() takes three vertices and rasterizes a filled triangle.

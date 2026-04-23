@@ -41,13 +41,13 @@ def update(dt):
 # must be built from triangles. Here are common reusable helpers.
 
 def poly(points, color):
-    """Draw a filled convex polygon as a triangle fan.
+    """Draw a filled convex polygon from a list of points.
 
     'points' is a list of (x, y) tuples.
     'color' is an (r, g, b) or (r, g, b, a) tuple.
 
-    A triangle fan shares the first vertex and walks through pairs of
-    subsequent vertices:
+    The polygon is built as a triangle fan: the first vertex is shared
+    and subsequent vertices are walked in pairs:
         triangle(p0, p1, p2)
         triangle(p0, p2, p3)
         triangle(p0, p3, p4)

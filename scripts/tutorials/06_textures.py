@@ -220,8 +220,9 @@ def draw():
 
     g.set_mode("transparent")
 
-    # The image() function uses a constant color. For per-vertex alpha
-    # we need to draw manually with vertex() and triangle():
+    # The image() function applies the same color to all four corners,
+    # so it can only do uniform transparency. For a per-vertex alpha
+    # gradient we need to build the quad manually with vertex():
     g.tex_bind(state["tex1"])
 
     # Draw a quad with fading alpha from top to bottom
